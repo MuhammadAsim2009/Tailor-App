@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'orders_screen.dart';
+import 'customers_screen.dart';
 
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
@@ -64,9 +66,13 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      body: SafeArea(
-        child: _isLoading ? _buildSkeletonLoading() : _buildContent(),
-      ),
+      body: _isLoading
+          ? SafeArea(child: _buildSkeletonLoading())
+          : _bottomNavIndex == 1
+              ? const OrdersScreen()
+              : _bottomNavIndex == 2
+                  ? const CustomersScreen()
+                  : SafeArea(child: _buildContent()),
       bottomNavigationBar: _AnimatedBottomBar(
         currentIndex: _bottomNavIndex,
         onTap: (index) => setState(() => _bottomNavIndex = index),
