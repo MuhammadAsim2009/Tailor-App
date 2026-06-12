@@ -3,6 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'orders_screen.dart';
 import 'customers_screen.dart';
+import 'speed_dial_fab.dart';
+import 'add_customer_screen.dart';
+import 'add_order_screen.dart';
+import 'order_detail_screen.dart';
 
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
@@ -77,7 +81,34 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         currentIndex: _bottomNavIndex,
         onTap: (index) => setState(() => _bottomNavIndex = index),
       ),
-      floatingActionButton: _buildFAB(),
+      floatingActionButton: _isLoading ? null : SpeedDialFAB(
+        options: [
+          SpeedDialOption(
+            icon: Icons.receipt_long_outlined,
+            label: 'Add Order',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AddOrderScreen(),
+                ),
+              );
+            },
+          ),
+          SpeedDialOption(
+            icon: Icons.person_add_outlined,
+            label: 'Add Customer',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AddCustomerScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -266,17 +297,34 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildActionItem(icon: Icons.add_circle_outline, label: 'New Order'),
-            _buildActionItem(icon: Icons.people_outline, label: 'Customers'),
-            _buildActionItem(icon: Icons.bar_chart_outlined, label: 'Reports'),
-            _buildActionItem(icon: Icons.straighten_outlined, label: 'Measurements'),
+            _buildActionItem(
+              icon: Icons.add_circle_outline,
+              label: 'New Order',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddOrderScreen()),
+              ),
+            ),
+            _buildActionItem(
+              icon: Icons.people_outline,
+              label: 'Customers',
+              onTap: () => setState(() => _bottomNavIndex = 2),
+            ),
+            _buildActionItem(
+              icon: Icons.bar_chart_outlined,
+              label: 'Reports',
+            ),
+            _buildActionItem(
+              icon: Icons.straighten_outlined,
+              label: 'Measurements',
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildActionItem({required IconData icon, required String label}) {
+  Widget _buildActionItem({required IconData icon, required String label, VoidCallback? onTap}) {
     return Column(
       children: [
         Container(
@@ -297,7 +345,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () {},
+              onTap: onTap,
               child: Icon(icon, color: kPrimaryColor),
             ),
           ),
@@ -392,6 +440,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 ],
               ),
               child: ListTile(
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderDetailScreen())),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 title: Text(
                   order.customerName,
@@ -470,18 +519,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   // Bottom nav replaced by _AnimatedBottomBar widget below
-
-  Widget _buildFAB() {
-    return AnimatedScale(
-      scale: _isLoading ? 0.0 : 1.0,
-      duration: const Duration(milliseconds: 300),
-      child: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: kAccentColor,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-    );
-  }
+  // FAB replaced by SpeedDialFAB — see floatingActionButton in build()
 
   // --- Skeletons ---
 

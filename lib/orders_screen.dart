@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'order_detail_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants (shared with rest of app)
@@ -457,7 +458,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(kRadius),
-          onTap: () {}, // Detail navigation placeholder
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderDetailScreen())),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
