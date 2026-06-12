@@ -96,15 +96,22 @@ class _CustomersScreenState extends State<CustomersScreen> {
         backgroundColor: kCardColor,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        automaticallyImplyLeading: false, // hidden if it's the root tab
+        automaticallyImplyLeading: false,
+        centerTitle: true,
         title: Text(
           'Customers',
-          style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: kPrimaryColor),
+          style: GoogleFonts.inter(
+            color: kPrimaryColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Colors.grey.shade100),
-        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.filter_list_outlined, color: kPrimaryColor),
+            onPressed: () {},
+          ),
+        ],
       ),
       body: Column(
         children: [

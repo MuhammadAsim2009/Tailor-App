@@ -199,6 +199,8 @@ class _AddOrderScreenState extends State<AddOrderScreen>
           content: Text('Please select a customer first.',
               style: GoogleFonts.inter(color: Colors.white)),
           backgroundColor: Colors.red.shade400,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
       return;
@@ -989,14 +991,15 @@ class _DatePickerField extends StatelessWidget {
       onTap: onTap,
       child: IgnorePointer(
         child: TextFormField(
+          key: ValueKey(date),
+          initialValue: date != null ? DateFormat('MMM dd, yyyy').format(date!) : null,
           validator: validator,
           style: GoogleFonts.inter(fontSize: 14, color: kTextPri),
           decoration: InputDecoration(
             labelText: label,
             labelStyle: GoogleFonts.inter(color: kTextSec, fontSize: 13),
-            hintText: date != null ? DateFormat('MMM dd, yyyy').format(date!) : 'Select',
-            hintStyle: GoogleFonts.inter(
-                color: date != null ? kTextPri : kTextSec, fontSize: 13),
+            hintText: 'Select',
+            hintStyle: GoogleFonts.inter(color: kTextSec, fontSize: 13),
             prefixIcon:
                 const Icon(Icons.calendar_today_outlined, color: kTextSec, size: 20),
             enabledBorder: OutlineInputBorder(

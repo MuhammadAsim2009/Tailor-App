@@ -26,8 +26,13 @@ class SpeedDialOption {
 //  SpeedDialFAB — main reusable widget
 //
 //  Uses Flutter's Overlay to cover the FULL screen (body + bottom
-//  nav) with a dark shade. Option buttons stack straight up above
-//  the FAB with staggered slide-in animations.
+//  nav) with a dark shade. Options are positioned diagonally upward
+//  and to the left, each step moving further up & left.
+//
+//  Diagonal layout (bottom-right to top-left, bottom-to-top order):
+//    option[0] (Add Order)    → 1 step up,  slight left
+//    option[1] (Add Expense)  → 2 steps up, more left
+//    option[2] (Add Customer) → 3 steps up, most left
 //
 //  Usage:
 //    floatingActionButton: SpeedDialFAB(options: [ ... ]),
@@ -58,7 +63,7 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 420),
     );
 
     // FAB icon rotates 45° (0.125 turns)
@@ -78,15 +83,16 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
     );
 
     // Staggered slide + fade per option
+    // Each option slides from slightly below-right to its final position
     _slideAnims = [];
     _fadeAnims  = [];
     for (int i = 0; i < widget.options.length; i++) {
       final start = 0.1 + i * 0.15;
       final end   = (start + 0.45).clamp(0.0, 1.0);
 
-      // Buttons slide straight up (no horizontal movement)
+      // Diagonal slide: come from bottom-right (0.6, 0.6) to zero
       _slideAnims.add(
-        Tween<Offset>(begin: const Offset(0, 0.8), end: Offset.zero).animate(
+        Tween<Offset>(begin: const Offset(0.5, 0.8), end: Offset.zero).animate(
           CurvedAnimation(
             parent: _controller,
             curve: Interval(start, end, curve: Curves.easeOutBack),
@@ -144,6 +150,12 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
     final fabRight  = screen.width  - fabGlobal.dx - fabSize.width;
     final fabBottom = screen.height - fabGlobal.dy - fabSize.height;
 
+    // Diagonal step offsets: each option moves up AND further left
+    // Step values: (verticalStepPx, horizontalStepPx) per index
+    // index 0 = lowest (Add Order), index 2 = highest (Add Customer)
+    const double vertStep  = 72.0;   // px up per option
+    const double horizStep = 20.0;   // px further right-edge per option (moves label left)
+
     _overlayEntry = OverlayEntry(
       builder: (overlayCtx) => Material(
         // Transparent Material fixes yellow debug underlines on Text
@@ -163,14 +175,17 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
                   ),
                 ),
 
-                // ── 2. Option buttons stacked straight up above the FAB ──
-                //    Right edge stays aligned with FAB; each step +74px up.
+                // ── 2. Option buttons positioned diagonally ──
                 ...List.generate(widget.options.length, (i) {
-                  final opt       = widget.options[i];
-                  final bottomPos = fabBottom + (i + 1) * 74.0;
+                  final opt        = widget.options[i];
+                  // i=0 is bottom (Add Order), i=N-1 is top (Add Customer)
+                  final bottomPos  = fabBottom + (i + 1) * vertStep;
+                  // Each higher option shifts slightly more to the right edge
+                  // which pushes the label further left visually
+                  final rightPos   = fabRight + i * horizStep;
 
                   return Positioned(
-                    right:  fabRight,
+                    right:  rightPos,
                     bottom: bottomPos,
                     child: FadeTransition(
                       opacity: _fadeAnims[i],

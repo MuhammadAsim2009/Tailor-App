@@ -241,32 +241,22 @@ class _OrdersScreenState extends State<OrdersScreen> {
       backgroundColor: kCardColor,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      leading: IconButton(
-        icon: const Icon(
-          Icons.arrow_back_ios_new_outlined,
-          color: kPrimaryColor,
-          size: 20,
-        ),
-        onPressed: () => Navigator.maybePop(context),
-      ),
+      automaticallyImplyLeading: false,
+      centerTitle: true,
       title: Text(
         'Orders',
         style: GoogleFonts.inter(
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
           color: kPrimaryColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
         ),
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.tune_outlined, color: kPrimaryColor),
-          onPressed: () {}, // filter / sort placeholder
+          icon: const Icon(Icons.filter_list_outlined, color: kPrimaryColor),
+          onPressed: () {},
         ),
       ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: Colors.grey.shade100),
-      ),
     );
   }
 

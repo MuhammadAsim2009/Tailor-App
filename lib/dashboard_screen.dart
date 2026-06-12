@@ -6,7 +6,9 @@ import 'customers_screen.dart';
 import 'speed_dial_fab.dart';
 import 'add_customer_screen.dart';
 import 'add_order_screen.dart';
+import 'add_expense_screen.dart';
 import 'order_detail_screen.dart';
+import 'expenses_screen.dart';
 
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
@@ -76,7 +78,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               ? const OrdersScreen()
               : _bottomNavIndex == 2
                   ? const CustomersScreen()
-                  : SafeArea(child: _buildContent()),
+                  : _bottomNavIndex == 3
+                      ? const ExpenseScreen()
+                      : SafeArea(child: _buildContent()),
       bottomNavigationBar: _AnimatedBottomBar(
         currentIndex: _bottomNavIndex,
         onTap: (index) => setState(() => _bottomNavIndex = index),
@@ -91,6 +95,31 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 context,
                 MaterialPageRoute(
                   builder: (_) => const AddOrderScreen(),
+                ),
+              );
+            },
+          ),
+          SpeedDialOption(
+            icon: Icons.account_balance_wallet_outlined,
+            label: 'Add Expense',
+            onTap: () {
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (_, animation, __) => const AddExpenseScreen(),
+                  transitionsBuilder: (_, animation, __, child) {
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 1),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOutCubic,
+                      )),
+                      child: child,
+                    );
+                  },
+                  transitionDuration: const Duration(milliseconds: 350),
                 ),
               );
             },
@@ -311,8 +340,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               onTap: () => setState(() => _bottomNavIndex = 2),
             ),
             _buildActionItem(
-              icon: Icons.bar_chart_outlined,
-              label: 'Reports',
+              icon: Icons.account_balance_wallet_outlined,
+              label: 'Expenses',
+              onTap: () => setState(() => _bottomNavIndex = 3),
             ),
             _buildActionItem(
               icon: Icons.straighten_outlined,
@@ -660,7 +690,7 @@ class _AnimatedBottomBarState extends State<_AnimatedBottomBar>
     _NavItem(label: 'Dashboard', outlineIcon: Icons.dashboard_outlined,    filledIcon: Icons.dashboard),
     _NavItem(label: 'Orders',    outlineIcon: Icons.receipt_long_outlined,  filledIcon: Icons.receipt_long),
     _NavItem(label: 'Customers', outlineIcon: Icons.people_outline,         filledIcon: Icons.people),
-    _NavItem(label: 'Profile',   outlineIcon: Icons.person_outline,         filledIcon: Icons.person),
+    _NavItem(label: 'Expenses',  outlineIcon: Icons.account_balance_wallet_outlined, filledIcon: Icons.account_balance_wallet),
   ];
 
   @override
