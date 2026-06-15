@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'profile_settings_screen.dart';
+import 'package:intl/intl.dart';
 import 'orders_screen.dart';
 import 'customers_screen.dart';
 import 'speed_dial_fab.dart';
@@ -25,8 +28,14 @@ class DummyOrder {
   final String orderType;
   final String deliveryDate;
   final String status;
-  
-  DummyOrder({required this.customerId, required this.customerName, required this.orderType, required this.deliveryDate, required this.status});
+
+  DummyOrder({
+    required this.customerId,
+    required this.customerName,
+    required this.orderType,
+    required this.deliveryDate,
+    required this.status,
+  });
 }
 
 class DashboardScreen extends StatefulWidget {
@@ -36,19 +45,55 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with TickerProviderStateMixin {
+class _DashboardScreenState extends State<DashboardScreen>
+    with TickerProviderStateMixin {
   int _bottomNavIndex = 0;
   String _activeStatusChip = 'Pending';
   bool _isLoading = true;
 
-  final List<String> _statusFilters = ['Pending', 'In Progress', 'Ready', 'Delivered'];
-  
+  final List<String> _statusFilters = [
+    'Pending',
+    'In Progress',
+    'Ready',
+    'Delivered',
+  ];
+
   final List<DummyOrder> _allOrders = [
-    DummyOrder(customerId: '101', customerName: 'Ahmed Ali', orderType: '3-Piece Suit', deliveryDate: '12 Jun 2026', status: 'Pending'),
-    DummyOrder(customerId: '102', customerName: 'Sara Khan', orderType: 'Kurta Shalwar', deliveryDate: '14 Jun 2026', status: 'In Progress'),
-    DummyOrder(customerId: '103', customerName: 'Usman Tariq', orderType: 'Formal Pant', deliveryDate: '10 Jun 2026', status: 'Ready'),
-    DummyOrder(customerId: '104', customerName: 'Aisha Bibi', orderType: 'Wedding Dress', deliveryDate: '08 Jun 2026', status: 'Delivered'),
-    DummyOrder(customerId: '105', customerName: 'Bilal Malik', orderType: '2-Piece Suit', deliveryDate: '15 Jun 2026', status: 'Pending'),
+    DummyOrder(
+      customerId: '101',
+      customerName: 'Ahmed Ali',
+      orderType: '3-Piece Suit',
+      deliveryDate: '12 Jun 2026',
+      status: 'Pending',
+    ),
+    DummyOrder(
+      customerId: '102',
+      customerName: 'Sara Khan',
+      orderType: 'Kurta Shalwar',
+      deliveryDate: '14 Jun 2026',
+      status: 'In Progress',
+    ),
+    DummyOrder(
+      customerId: '103',
+      customerName: 'Usman Tariq',
+      orderType: 'Formal Pant',
+      deliveryDate: '10 Jun 2026',
+      status: 'Ready',
+    ),
+    DummyOrder(
+      customerId: '104',
+      customerName: 'Aisha Bibi',
+      orderType: 'Wedding Dress',
+      deliveryDate: '08 Jun 2026',
+      status: 'Delivered',
+    ),
+    DummyOrder(
+      customerId: '105',
+      customerName: 'Bilal Malik',
+      orderType: '2-Piece Suit',
+      deliveryDate: '15 Jun 2026',
+      status: 'Pending',
+    ),
   ];
 
   @override
@@ -65,7 +110,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   }
 
   List<DummyOrder> get _filteredOrders {
-    return _allOrders.where((order) => order.status == _activeStatusChip).toList();
+    return _allOrders
+        .where((order) => order.status == _activeStatusChip)
+        .toList();
   }
 
   @override
@@ -75,57 +122,62 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       body: _isLoading
           ? SafeArea(child: _buildSkeletonLoading())
           : _bottomNavIndex == 1
-              ? const OrdersScreen()
-              : _bottomNavIndex == 2
-                  ? const CustomersScreen()
-                  : _bottomNavIndex == 3
-                      ? const ExpenseScreen()
-                      : SafeArea(child: _buildContent()),
+          ? const OrdersScreen()
+          : _bottomNavIndex == 2
+          ? const CustomersScreen()
+          : _bottomNavIndex == 3
+          ? const ExpenseScreen()
+          : SafeArea(child: _buildContent()),
       bottomNavigationBar: _AnimatedBottomBar(
         currentIndex: _bottomNavIndex,
         onTap: (index) => setState(() => _bottomNavIndex = index),
       ),
-      floatingActionButton: _isLoading ? null : SpeedDialFAB(
-        options: [
-          SpeedDialOption(
-            icon: Icons.receipt_long_outlined,
-            label: 'Add Order',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AddOrderScreen(),
-                ),
-              );
-            },
-          ),
-          SpeedDialOption(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'Add Expense',
-            onTap: () {
-              Navigator.push(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (_, animation, secondaryAnimation) => const AddExpenseScreen(),
-                  transitionsBuilder: (_, animation, secondaryAnimation, child) {
-                    return SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 1),
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeOutCubic,
-                      )),
-                      child: child,
+      floatingActionButton: _isLoading
+          ? null
+          : SpeedDialFAB(
+              options: [
+                SpeedDialOption(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'Add Order',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AddOrderScreen()),
                     );
                   },
-                  transitionDuration: const Duration(milliseconds: 350),
                 ),
-              );
-            },
-          ),
-        ],
-      ),
+                SpeedDialOption(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: 'Add Expense',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (_, animation, secondaryAnimation) =>
+                            const AddExpenseScreen(),
+                        transitionsBuilder:
+                            (_, animation, secondaryAnimation, child) {
+                              return SlideTransition(
+                                position:
+                                    Tween<Offset>(
+                                      begin: const Offset(0, 1),
+                                      end: Offset.zero,
+                                    ).animate(
+                                      CurvedAnimation(
+                                        parent: animation,
+                                        curve: Curves.easeOutCubic,
+                                      ),
+                                    ),
+                                child: child,
+                              );
+                            },
+                        transitionDuration: const Duration(milliseconds: 350),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
     );
   }
 
@@ -181,22 +233,41 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
           ],
         ),
-        Container(
-          decoration: BoxDecoration(
-            color: kCardColor,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: kTextPrimary.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: kCardColor,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: kTextPrimary.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, color: kPrimaryColor),
-            onPressed: () {},
-          ),
+              child: IconButton(
+                icon: const Icon(Icons.person_outline, color: kPrimaryColor),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          const ProfileSettingsScreen(),
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                            return child; // The screen has its own internal slide animation
+                          },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -275,9 +346,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: iconColor ?? textColor, size: 24),
-            ],
+            children: [Icon(icon, color: iconColor ?? textColor, size: 24)],
           ),
           const Spacer(),
           AnimatedCounter(
@@ -308,7 +377,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       children: [
         Text(
           'Quick Actions',
-          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimaryColor),
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: kPrimaryColor,
+          ),
         ),
         const SizedBox(height: 16),
         Row(
@@ -343,7 +416,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     );
   }
 
-  Widget _buildActionItem({required IconData icon, required String label, VoidCallback? onTap}) {
+  Widget _buildActionItem({
+    required IconData icon,
+    required String label,
+    VoidCallback? onTap,
+  }) {
     return Column(
       children: [
         Container(
@@ -415,7 +492,10 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   ),
                 ),
                 showCheckmark: false,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
               ),
             ),
           );
@@ -430,7 +510,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       children: [
         Text(
           'Recent Orders',
-          style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimaryColor),
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: kPrimaryColor,
+          ),
         ),
         const SizedBox(height: 16),
         if (_filteredOrders.isEmpty)
@@ -459,11 +543,20 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 ],
               ),
               child: ListTile(
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderDetailScreen())),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const OrderDetailScreen()),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 title: Text(
                   order.customerName,
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kTextPrimary),
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    color: kTextPrimary,
+                  ),
                 ),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,21 +564,35 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     const SizedBox(height: 4),
                     Text(
                       'ID: ${order.customerId}',
-                      style: GoogleFonts.inter(color: kAccentColor, fontSize: 12, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: kAccentColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       order.orderType,
-                      style: GoogleFonts.inter(color: kTextSecondary, fontSize: 13),
+                      style: GoogleFonts.inter(
+                        color: kTextSecondary,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        const Icon(Icons.calendar_today_outlined, size: 14, color: kTextSecondary),
+                        const Icon(
+                          Icons.calendar_today_outlined,
+                          size: 14,
+                          color: kTextSecondary,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           order.deliveryDate,
-                          style: GoogleFonts.inter(color: kTextSecondary, fontSize: 12),
+                          style: GoogleFonts.inter(
+                            color: kTextSecondary,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -610,7 +717,8 @@ class AnimatedCounter extends StatefulWidget {
   State<AnimatedCounter> createState() => _AnimatedCounterState();
 }
 
-class _AnimatedCounterState extends State<AnimatedCounter> with SingleTickerProviderStateMixin {
+class _AnimatedCounterState extends State<AnimatedCounter>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<int> _animation;
 
@@ -621,9 +729,10 @@ class _AnimatedCounterState extends State<AnimatedCounter> with SingleTickerProv
       vsync: this,
       duration: const Duration(seconds: 2),
     );
-    _animation = IntTween(begin: 0, end: widget.targetValue).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-    );
+    _animation = IntTween(
+      begin: 0,
+      end: widget.targetValue,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
     _controller.forward();
   }
 
@@ -631,9 +740,10 @@ class _AnimatedCounterState extends State<AnimatedCounter> with SingleTickerProv
   void didUpdateWidget(covariant AnimatedCounter oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.targetValue != widget.targetValue) {
-      _animation = IntTween(begin: _animation.value, end: widget.targetValue).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-      );
+      _animation = IntTween(begin: _animation.value, end: widget.targetValue)
+          .animate(
+            CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+          );
       _controller.forward(from: 0.0);
     }
   }
@@ -665,10 +775,7 @@ class _AnimatedBottomBar extends StatefulWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  const _AnimatedBottomBar({
-    required this.currentIndex,
-    required this.onTap,
-  });
+  const _AnimatedBottomBar({required this.currentIndex, required this.onTap});
 
   @override
   State<_AnimatedBottomBar> createState() => _AnimatedBottomBarState();
@@ -681,10 +788,26 @@ class _AnimatedBottomBarState extends State<_AnimatedBottomBar>
   int _previousIndex = 0;
 
   static const _items = [
-    _NavItem(label: 'Dashboard', outlineIcon: Icons.dashboard_outlined,    filledIcon: Icons.dashboard),
-    _NavItem(label: 'Orders',    outlineIcon: Icons.receipt_long_outlined,  filledIcon: Icons.receipt_long),
-    _NavItem(label: 'Customers', outlineIcon: Icons.people_outline,         filledIcon: Icons.people),
-    _NavItem(label: 'Expenses',  outlineIcon: Icons.account_balance_wallet_outlined, filledIcon: Icons.account_balance_wallet),
+    _NavItem(
+      label: 'Dashboard',
+      outlineIcon: Icons.dashboard_outlined,
+      filledIcon: Icons.dashboard,
+    ),
+    _NavItem(
+      label: 'Orders',
+      outlineIcon: Icons.receipt_long_outlined,
+      filledIcon: Icons.receipt_long,
+    ),
+    _NavItem(
+      label: 'Customers',
+      outlineIcon: Icons.people_outline,
+      filledIcon: Icons.people,
+    ),
+    _NavItem(
+      label: 'Expenses',
+      outlineIcon: Icons.account_balance_wallet_outlined,
+      filledIcon: Icons.account_balance_wallet,
+    ),
   ];
 
   @override
@@ -694,20 +817,32 @@ class _AnimatedBottomBarState extends State<_AnimatedBottomBar>
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
-    _pillPosition = Tween<double>(
-      begin: widget.currentIndex.toDouble(),
-      end: widget.currentIndex.toDouble(),
-    ).animate(CurvedAnimation(parent: _pillController, curve: Curves.easeInOutCubic));
+    _pillPosition =
+        Tween<double>(
+          begin: widget.currentIndex.toDouble(),
+          end: widget.currentIndex.toDouble(),
+        ).animate(
+          CurvedAnimation(
+            parent: _pillController,
+            curve: Curves.easeInOutCubic,
+          ),
+        );
   }
 
   @override
   void didUpdateWidget(covariant _AnimatedBottomBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentIndex != widget.currentIndex) {
-      _pillPosition = Tween<double>(
-        begin: _previousIndex.toDouble(),
-        end: widget.currentIndex.toDouble(),
-      ).animate(CurvedAnimation(parent: _pillController, curve: Curves.easeInOutCubic));
+      _pillPosition =
+          Tween<double>(
+            begin: _previousIndex.toDouble(),
+            end: widget.currentIndex.toDouble(),
+          ).animate(
+            CurvedAnimation(
+              parent: _pillController,
+              curve: Curves.easeInOutCubic,
+            ),
+          );
       _pillController.forward(from: 0);
       _previousIndex = widget.currentIndex;
     }
@@ -748,7 +883,9 @@ class _AnimatedBottomBarState extends State<_AnimatedBottomBar>
                   height: 3,
                   decoration: BoxDecoration(
                     color: kAccentColor,
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(4)),
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(4),
+                    ),
                   ),
                 ),
               ),
@@ -803,11 +940,14 @@ class _BottomNavItemState extends State<_BottomNavItem>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _scaleAnim = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3),  weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 1.3, end: 0.88), weight: 30),
-      TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.0), weight: 30),
-    ]).animate(CurvedAnimation(parent: _bounceController, curve: Curves.easeOut));
+    _scaleAnim =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.3), weight: 40),
+          TweenSequenceItem(tween: Tween(begin: 1.3, end: 0.88), weight: 30),
+          TweenSequenceItem(tween: Tween(begin: 0.88, end: 1.0), weight: 30),
+        ]).animate(
+          CurvedAnimation(parent: _bounceController, curve: Curves.easeOut),
+        );
   }
 
   @override
@@ -842,7 +982,9 @@ class _BottomNavItemState extends State<_BottomNavItem>
                 transitionBuilder: (child, anim) =>
                     ScaleTransition(scale: anim, child: child),
                 child: Icon(
-                  widget.isActive ? widget.item.filledIcon : widget.item.outlineIcon,
+                  widget.isActive
+                      ? widget.item.filledIcon
+                      : widget.item.outlineIcon,
                   key: ValueKey(widget.isActive),
                   color: widget.isActive ? kAccentColor : kTextSecondary,
                   size: 24,
@@ -855,7 +997,9 @@ class _BottomNavItemState extends State<_BottomNavItem>
               duration: const Duration(milliseconds: 250),
               style: GoogleFonts.inter(
                 fontSize: 11,
-                fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: widget.isActive
+                    ? FontWeight.w600
+                    : FontWeight.normal,
                 color: widget.isActive ? kAccentColor : kTextSecondary,
               ),
               child: Text(widget.item.label),
@@ -878,4 +1022,3 @@ class _NavItem {
     required this.filledIcon,
   });
 }
-
