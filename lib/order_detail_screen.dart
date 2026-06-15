@@ -1,7 +1,11 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:screenshot/screenshot.dart';
+import 'package:gal/gal.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'edit_order_screen.dart';
-
+import 'receipt_widget.dart';
 // --- Design System Constants ---
 const Color kPrimary = Color(0xFF1E3A5F); // Deep Navy
 const Color kAccent = Color(0xFF10B981); // Emerald Green
@@ -23,6 +27,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
   String _status = 'In Progress'; // Pending, In Progress, Ready, Delivered
   final double _totalAmount = 5000.0;
   double _advancePaid = 2000.0;
+  
+  bool _isDownloading = false;
+  final ScreenshotController _screenshotController = ScreenshotController();
   
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -60,6 +67,84 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
         return kAccent;
       default:
         return kTextSec;
+    }
+  }
+
+  Future<void> _downloadReceipt() async {
+    setState(() => _isDownloading = true);
+    
+    try {
+      // gal handles gallery permission natively
+      final hasAccess = await Gal.requestAccess();
+      if (!hasAccess) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Gallery permission denied. Please allow in Settings.'),
+              backgroundColor: Colors.red.shade600,
+              action: SnackBarAction(
+                label: 'Settings',
+                textColor: Colors.white,
+                onPressed: () => openAppSettings(),
+              ),
+            ),
+          );
+        }
+        setState(() => _isDownloading = false);
+        return;
+      }
+
+      // Capture receipt widget off-screen as PNG bytes
+      final Uint8List bytes = await _screenshotController.captureFromWidget(
+        const Material(
+          type: MaterialType.transparency,
+          child: Directionality(
+            textDirection: TextDirection.ltr,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topCenter,
+              child: ReceiptWidget(),
+            ),
+          ),
+        ),
+        delay: const Duration(milliseconds: 200),
+      );
+
+      // Save to gallery using gal (returns void, throws on failure)
+      await Gal.putImageBytes(
+        bytes,
+        name: "IrfanTailors_Receipt_${DateTime.now().millisecondsSinceEpoch}",
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Receipt saved to gallery! 📥', style: GoogleFonts.inter(color: Colors.white)),
+              ],
+            ),
+            backgroundColor: kAccent,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save receipt: $e'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
     }
   }
 
@@ -112,6 +197,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             _buildTimelineCard(),
             const SizedBox(height: 24),
             _buildBottomActions(),
+            const SizedBox(height: 16),
+            _buildDownloadReceiptButton(),
             const SizedBox(height: 32),
           ],
         ),
@@ -165,6 +252,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                     ),
                     const SizedBox(height: 4),
                     Text(
+                      'ID: 101',
+                      style: GoogleFonts.inter(fontSize: 13, color: kAccent, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
                       '+92 300 1234567',
                       style: GoogleFonts.inter(
                         fontSize: 14,
@@ -190,22 +282,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
               ),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: kPrimary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '3-Piece Suit',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -364,35 +440,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           const SizedBox(height: 12),
           _buildInfoRow(Icons.local_shipping_outlined, 'Delivery Date', '12 Jun 2026'),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.bolt_outlined, size: 20, color: kTextSec),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text('Priority', style: GoogleFonts.inter(fontSize: 14, color: kTextSec)),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'High',
-                  style: GoogleFonts.inter(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildInfoRow(Icons.checkroom_outlined, 'Garment Type', '3-Piece Suit'),
-          const SizedBox(height: 12),
           _buildInfoRow(Icons.format_list_numbered_outlined, 'Quantity', '2'),
           const SizedBox(height: 16),
           const Divider(height: 1),
           const SizedBox(height: 16),
-          _buildFullWidthNote(Icons.texture_outlined, 'Fabric Notes', 'Navy Blue Worsted Wool, imported. Client provided fabric 4 meters.'),
-          const SizedBox(height: 12),
           _buildFullWidthNote(Icons.notes_outlined, 'Special Notes', 'Tight fit on the waist, wide leg pants as per reference image.'),
         ],
       ),
@@ -442,18 +493,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
   Widget _buildMeasurementsCard() {
     final Map<String, String> measurements = {
       'Length': '40',
-      'Arm': '24',
-      'Shoulders': '18',
-      'Collar': '15.5',
-      'Half Sherwani': 'N/A',
       'Chest': '42',
       'Waist': '34',
+      'Shoulder': '18',
       'Hip': '40',
-      'Shalwar': '38',
       'Bottom': '14',
+      'Arm': '24',
+      'Sherwani': 'Half',
+      'Shalwar': '38',
     };
 
-    final List<String> additionalOptions = ['Plate', 'Front Pocket', 'Cuff'];
+    final List<String> designOptions = ['Plate', 'Front Pocket', 'Cuff (Rounded)'];
 
     return _buildSectionCard(
       title: 'Measurements',
@@ -490,15 +540,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           ),
           const SizedBox(height: 24),
           Text(
-            'Additional Options',
+            'Design Options',
             style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: kPrimary),
           ),
           const SizedBox(height: 12),
-          additionalOptions.isNotEmpty
+          designOptions.isNotEmpty
               ? Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: additionalOptions.map((opt) {
+                  children: designOptions.map((opt) {
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -618,20 +668,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     final bool isDelivered = _status == 'Delivered';
 
     if (isDelivered) {
-      return SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: OutlinedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.download_outlined),
-          label: Text('Download Receipt', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: kPrimary,
-            side: const BorderSide(color: kPrimary, width: 2),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
-          ),
-        ),
-      );
+      return const SizedBox.shrink(); // Replaced by _buildDownloadReceiptButton
     }
 
     return Row(
@@ -714,6 +751,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           const SizedBox(height: 20),
           child,
         ],
+      ),
+    );
+  }
+
+  Widget _buildDownloadReceiptButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 54,
+      child: OutlinedButton.icon(
+        onPressed: _isDownloading ? null : _downloadReceipt,
+        icon: _isDownloading 
+          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.download_outlined),
+        label: Text(
+          _isDownloading ? 'Saving Receipt...' : 'Download Receipt', 
+          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: kPrimary,
+          side: const BorderSide(color: kPrimary, width: 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+        ),
       ),
     );
   }

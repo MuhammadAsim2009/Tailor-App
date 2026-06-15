@@ -129,46 +129,36 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     return Scaffold(
       backgroundColor: _kBg,
       appBar: _buildAppBar(),
-      body: GestureDetector(
-        // HitTestBehavior.translucent: dismisses keyboard when user taps
-        // empty areas, but does NOT consume taps headed to child widgets.
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: SingleChildScrollView(
-          // ClampingScrollPhysics is the Android-native scroll behaviour.
-          // BouncingScrollPhysics (iOS style) is aggressive on Android and
-          // can cause the gesture arena to misclassify short taps as flings,
-          // which is exactly what 'I/ScrollIdentify: on fling' reveals.
-          physics: const ClampingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── 1. Category Selector ──
-              _buildSectionCard(
-                title: 'Category',
-                child: _buildCategoryGrid(),
-              ),
+      body: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── 1. Category Selector ──
+            _buildSectionCard(
+              title: 'Category',
+              child: _buildCategoryGrid(),
+            ),
 
-              const SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-              // ── 2. Prominent Amount Display ──
-              _buildAmountDisplay(),
+            // ── 2. Prominent Amount Display ──
+            _buildAmountDisplay(),
 
-              const SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-              // ── 3. Expense Details ──
-              _buildSectionCard(
-                title: 'Expense Details',
-                child: _buildDetailsForm(),
-              ),
+            // ── 3. Expense Details ──
+            _buildSectionCard(
+              title: 'Expense Details',
+              child: _buildDetailsForm(),
+            ),
 
-              const SizedBox(height: 32),
+            const SizedBox(height: 32),
 
-              // ── 4. Save Button ──
-              _buildSaveButton(),
-            ],
-          ),
+            // ── 4. Save Button ──
+            _buildSaveButton(),
+          ],
         ),
       ),
     );

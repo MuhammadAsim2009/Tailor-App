@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-
-import 'add_customer_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
@@ -17,26 +14,72 @@ const Color kTextSec = Color(0xFF64748B);
 const double kR = 16.0;
 
 // ─────────────────────────────────────────────────────────────────
-//  Dummy Data Models
+//  Dummy Data Model
 // ─────────────────────────────────────────────────────────────────
 class DummyCustomer {
   final String id;
   final String name;
   final String phone;
-  final Map<String, String>? measurements;
-  final Map<String, bool>? options;
+  final String? address;
+
+  // Saved measurements
+  final String? lengthMeasure;
+  final String? armMeasure;
+  final bool optMundo;
+  final String? shoulderMeasure;
+  final String? collarMeasure;
+  final bool colRegular;
+  final bool colFrench;
+  final bool colSherwani;
+  final String sherwaniType;
+  final String? chestMeasure;
+  final String? waistMeasure;
+  final String? hipMeasure;
+  final String? shalwarMeasure;
+  final bool shalKanto;
+  final bool shalZipPocket;
+  final bool shalWidth;
+  final String? bottomMeasure;
+  final String? plateMeasure;
+  final bool optFrontPocket;
+  final String? frontPocketMeasure;
+  final bool optSidePocket;
+  final String cuffType;
+  final String? extraNotes;
 
   DummyCustomer({
     required this.id,
     required this.name,
     required this.phone,
-    this.measurements,
-    this.options,
+    this.address,
+    this.lengthMeasure,
+    this.armMeasure,
+    this.optMundo = false,
+    this.shoulderMeasure,
+    this.collarMeasure,
+    this.colRegular = false,
+    this.colFrench = false,
+    this.colSherwani = false,
+    this.sherwaniType = 'Half',
+    this.chestMeasure,
+    this.waistMeasure,
+    this.hipMeasure,
+    this.shalwarMeasure,
+    this.shalKanto = false,
+    this.shalZipPocket = false,
+    this.shalWidth = false,
+    this.bottomMeasure,
+    this.plateMeasure,
+    this.optFrontPocket = false,
+    this.frontPocketMeasure,
+    this.optSidePocket = false,
+    this.cuffType = 'Round',
+    this.extraNotes,
   });
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  AddOrderScreen — 2-Step Wizard
+//  AddOrderScreen — 4-Step Wizard
 // ─────────────────────────────────────────────────────────────────
 class AddOrderScreen extends StatefulWidget {
   const AddOrderScreen({super.key});
@@ -48,119 +91,71 @@ class AddOrderScreen extends StatefulWidget {
 class _AddOrderScreenState extends State<AddOrderScreen>
     with SingleTickerProviderStateMixin {
   // ── Step tracking ──
-  int _currentStep = 0; // 0 = Order Details, 1 = Measurements
+  int _currentStep = 0; // 0=Customer, 1=Type, 2=Details, 3=Measurements
   final PageController _pageController = PageController();
 
-  // ── Step 1: Customer Selection ──
-  final List<DummyCustomer> _customers = [
+  // ── Step 1: Customer Details ──
+  final _formKey1 = GlobalKey<FormState>();
+  final _idCtrl = TextEditingController(text: '101');
+  final _nameCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _addrCtrl = TextEditingController();
+
+  final List<DummyCustomer> _dummyCustomers = [
     DummyCustomer(
-      id: '1',
-      name: 'Ahmed Ali',
-      phone: '+92 300 1234567',
-      measurements: {
-        'Length': '40',
-        'Arm': '24',
-        'Shoulders': '18',
-        'Collar': '15',
-        'Half Sherwani': '16',
-        'Chest': '38',
-        'Waist': '34',
-        'Hip': '40',
-        'Shalwar': '38',
-        'Bottom': '7',
-      },
-      options: {
-        'Plate': true,
-        'Front Pocket': true,
-        'Cuff': false,
-        'Mundho': false,
-      },
-    ),
-    DummyCustomer(
-      id: '2',
-      name: 'Usman Khan',
-      phone: '+92 311 9876543',
-      measurements: null, // No saved measurements
-    ),
-    DummyCustomer(
-      id: '3',
-      name: 'Bilal Malik',
-      phone: '+92 333 4455667',
-      measurements: {
-        'Length': '38',
-        'Arm': '23',
-        'Shoulders': '17',
-        'Collar': '14.5',
-        'Half Sherwani': '15',
-        'Chest': '36',
-        'Waist': '32',
-        'Hip': '38',
-        'Shalwar': '36',
-        'Bottom': '6.5',
-      },
-      options: {
-        'Plate': false,
-        'Front Pocket': false,
-        'Cuff': true,
-        'Mundho': true,
-      },
+      id: '101', name: 'Ahmed Ali', phone: '+92 300 1234567', address: 'Lahore',
+      lengthMeasure: '40', chestMeasure: '42', waistMeasure: '34', shoulderMeasure: '18', hipMeasure: '40', bottomMeasure: '14',
+      armMeasure: '24', optMundo: true,
+      collarMeasure: '16', colSherwani: true, sherwaniType: 'Half',
+      shalwarMeasure: '36', shalKanto: true,
+      plateMeasure: '12', optFrontPocket: true, frontPocketMeasure: '5', optSidePocket: false,
+      cuffType: 'Round', extraNotes: 'Need it urgently by evening.',
     ),
   ];
 
   DummyCustomer? _selectedCustomer;
-  final TextEditingController _searchCtrl = TextEditingController();
+  bool _measurementsLocked = false; // only locked when auto-filled from an existing customer
 
-  // ── Step 1: Order Info ──
-  final _formKey1 = GlobalKey<FormState>();
-  String? _garmentType;
-  final List<String> _garmentTypes = [
-    'Shirt',
-    'Pant',
-    'Suit',
-    'Shalwar Kameez',
-    'Sherwani',
-    'Other'
-  ];
-  final _fabricNotesCtrl = TextEditingController();
-  final _quantityCtrl = TextEditingController();
-  DateTime? _orderDate;
-  DateTime? _deliveryDate;
-  String _priority = 'Medium'; // Low, Medium, High
+  // ── Step 2: Customer Type ──
+  bool _isAdult = true;
 
-  // ── Step 1: Pricing ──
+  // ── Step 3: Order Details ──
+  final _formKey3 = GlobalKey<FormState>();
+  final _quantityCtrl = TextEditingController(text: '1');
+  DateTime? _orderDate = DateTime.now();
+  DateTime? _deliveryDate = DateTime.now().add(const Duration(days: 7));
   final _totalCtrl = TextEditingController();
   final _advanceCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
 
-  // ── Step 2: Measurements ──
-  bool _isInches = false; // false = cm, true = inches
-  bool _updateMeasurements = false; // Toggle to allow editing
-  bool _hasLoadedMeasurements = false;
-
-  final Map<String, TextEditingController> _measureCtrl = {
-    'Length': TextEditingController(),
-    'Arm': TextEditingController(),
-    'Shoulders': TextEditingController(),
-    'Collar': TextEditingController(),
-    'Half Sherwani': TextEditingController(),
-    'Chest': TextEditingController(),
-    'Waist': TextEditingController(),
-    'Hip': TextEditingController(),
-    'Shalwar': TextEditingController(),
-    'Bottom': TextEditingController(),
-  };
-
-  final Map<String, bool> _optionsMap = {
-    'Plate': false,
-    'Front Pocket': false,
-    'Cuff': false,
-    'Mundho': false,
-  };
+  // ── Step 4: Measurements ──
+  final _lengthCtrl = TextEditingController();
+  final _armCtrl = TextEditingController();
+  bool _optMundo = false;
+  final _shoulderCtrl = TextEditingController();
+  final _collarCtrl = TextEditingController();
+  bool _colRegular = false;
+  bool _colFrench = false;
+  bool _colSherwani = false;
+  String _sherwaniType = 'Half'; // 'Half' or 'Full'
+  final _chestCtrl = TextEditingController();
+  final _waistCtrl = TextEditingController();
+  final _hipCtrl = TextEditingController();
+  final _shalwarCtrl = TextEditingController();
+  bool _shalKanto = false;
+  bool _shalZipPocket = false;
+  bool _shalWidth = false;
+  final _bottomCtrl = TextEditingController();
+  final _plateCtrl = TextEditingController();
+  bool _optFrontPocket = false;
+  final _frontPocketCtrl = TextEditingController();
+  bool _optSidePocket = false;
+  String _cuffType = 'Round'; // Round, Double kaj, Double, Square
+  final _extraCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Auto-calculate remaining balance
     _totalCtrl.addListener(_updateBalance);
     _advanceCtrl.addListener(_updateBalance);
   }
@@ -168,15 +163,26 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   @override
   void dispose() {
     _pageController.dispose();
-    _searchCtrl.dispose();
-    _fabricNotesCtrl.dispose();
+    _idCtrl.dispose();
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _addrCtrl.dispose();
     _quantityCtrl.dispose();
     _totalCtrl.dispose();
     _advanceCtrl.dispose();
     _notesCtrl.dispose();
-    for (final c in _measureCtrl.values) {
-      c.dispose();
-    }
+    _lengthCtrl.dispose();
+    _armCtrl.dispose();
+    _shoulderCtrl.dispose();
+    _collarCtrl.dispose();
+    _chestCtrl.dispose();
+    _waistCtrl.dispose();
+    _hipCtrl.dispose();
+    _shalwarCtrl.dispose();
+    _bottomCtrl.dispose();
+    _plateCtrl.dispose();
+    _frontPocketCtrl.dispose();
+    _extraCtrl.dispose();
     super.dispose();
   }
 
@@ -187,77 +193,35 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     return (total - advance).clamp(0.0, double.infinity);
   }
 
-  void _updateBalance() {
-    setState(() {}); // Rebuild to update balance display
-  }
+  void _updateBalance() => setState(() {});
 
-  // ── Navigate to Step 2 ──
+  // ── Navigation ──
   void _nextStep() {
-    if (_selectedCustomer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please select a customer first.',
-              style: GoogleFonts.inter(color: Colors.white)),
-          backgroundColor: Colors.red.shade400,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
-      return;
-    }
-    if (_formKey1.currentState!.validate()) {
-      _populateMeasurements();
-      setState(() => _currentStep = 1);
-      _pageController.animateToPage(
-        1,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeInOut,
-      );
-    }
-  }
+    if (_currentStep == 0 && !_formKey1.currentState!.validate()) return;
+    if (_currentStep == 3 && !_formKey3.currentState!.validate()) return;
 
-  // ── Populate auto-fill data ──
-  void _populateMeasurements() {
-    if (_selectedCustomer?.measurements != null) {
-      _hasLoadedMeasurements = true;
-      _updateMeasurements = false; // Read-only by default
-      _selectedCustomer!.measurements!.forEach((key, value) {
-        if (_measureCtrl.containsKey(key)) {
-          _measureCtrl[key]!.text = value;
-        }
-      });
-      _selectedCustomer!.options?.forEach((key, value) {
-        if (_optionsMap.containsKey(key)) {
-          _optionsMap[key] = value;
-        }
-      });
+    if (_currentStep < 3) {
+      setState(() => _currentStep++);
+      _pageController.animateToPage(_currentStep,
+          duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
     } else {
-      _hasLoadedMeasurements = false;
-      _updateMeasurements = true; // Editable by default
-      for (final c in _measureCtrl.values) {
-        c.clear();
-      }
-      _optionsMap.updateAll((key, value) => false);
+      _confirmOrder();
     }
   }
 
-  // ── Navigate back to Step 1 ──
   void _prevStep() {
-    setState(() => _currentStep = 0);
-    _pageController.animateToPage(
-      0,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOut,
-    );
+    if (_currentStep > 0) {
+      setState(() => _currentStep--);
+      _pageController.animateToPage(_currentStep,
+          duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
+    }
   }
 
-  // ── Confirm Order ──
   void _confirmOrder() {
-    // TODO: save to backend
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Order created for ${_selectedCustomer?.name}!',
+        content: Text('Order created for ${_nameCtrl.text}!',
             style: GoogleFonts.inter(color: Colors.white)),
         backgroundColor: kAccent,
         behavior: SnackBarBehavior.floating,
@@ -266,24 +230,19 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     );
   }
 
-  Future<void> _selectDate(BuildContext context, bool isDelivery) async {
+  Future<void> _selectDate(bool isDelivery) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(Duration(days: isDelivery ? 7 : 0)),
+      initialDate: isDelivery ? _deliveryDate! : _orderDate!,
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: kAccent, // header background color
-              onPrimary: Colors.white, // header text color
-              onSurface: kPrimary, // body text color
-            ),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: kAccent, onPrimary: Colors.white, onSurface: kPrimary),
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) {
       setState(() {
@@ -296,6 +255,102 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     }
   }
 
+  void _fillMeasurements(DummyCustomer c) {
+    _lengthCtrl.text = c.lengthMeasure ?? '';
+    _armCtrl.text = c.armMeasure ?? '';
+    _optMundo = c.optMundo;
+    _shoulderCtrl.text = c.shoulderMeasure ?? '';
+    _collarCtrl.text = c.collarMeasure ?? '';
+    _colRegular = c.colRegular;
+    _colFrench = c.colFrench;
+    _colSherwani = c.colSherwani;
+    _sherwaniType = c.sherwaniType;
+    _chestCtrl.text = c.chestMeasure ?? '';
+    _waistCtrl.text = c.waistMeasure ?? '';
+    _hipCtrl.text = c.hipMeasure ?? '';
+    _shalwarCtrl.text = c.shalwarMeasure ?? '';
+    _shalKanto = c.shalKanto;
+    _shalZipPocket = c.shalZipPocket;
+    _shalWidth = c.shalWidth;
+    _bottomCtrl.text = c.bottomMeasure ?? '';
+    _plateCtrl.text = c.plateMeasure ?? '';
+    _optFrontPocket = c.optFrontPocket;
+    _frontPocketCtrl.text = c.frontPocketMeasure ?? '';
+    _optSidePocket = c.optSidePocket;
+    _cuffType = c.cuffType;
+    _extraCtrl.text = c.extraNotes ?? '';
+  }
+
+  void _showExistingCustomerModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(kR)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Select Existing Customer',
+                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimary)),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _dummyCustomers.length,
+                  separatorBuilder: (context, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final c = _dummyCustomers[index];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: kAccent.withOpacity(0.1),
+                        child: Text(
+                          c.name.isNotEmpty ? c.name[0] : '?',
+                          style: GoogleFonts.inter(color: kAccent, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      title: Text(c.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                      subtitle: Text(c.phone, style: GoogleFonts.inter(color: kTextSec, fontSize: 12)),
+                      trailing: c.lengthMeasure != null
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: kAccent.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text('Has Data',
+                                  style: GoogleFonts.inter(fontSize: 11, color: kAccent, fontWeight: FontWeight.bold)),
+                            )
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedCustomer = c;
+                          _idCtrl.text = c.id;
+                          _nameCtrl.text = c.name;
+                          _phoneCtrl.text = c.phone;
+                          _addrCtrl.text = c.address ?? '';
+                          if (c.lengthMeasure != null) {
+                            _fillMeasurements(c);
+                            _measurementsLocked = true;
+                          } else {
+                            _measurementsLocked = false;
+                          }
+                        });
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -306,17 +361,17 @@ class _AddOrderScreenState extends State<AddOrderScreen>
         body: Column(
           children: [
             const SizedBox(height: 24),
-            // ── Step indicator ──
-            _StepIndicator(currentStep: _currentStep),
+            _buildStepper(),
             const SizedBox(height: 24),
-            // ── Slide between steps ──
             Expanded(
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _buildStep1(),
-                  _buildStep2(),
+                  _buildStep1Customer(),
+                  _buildStep2Type(),
+                  _buildStep4Measurements(),
+                  _buildStep3Order(),
                 ],
               ),
             ),
@@ -332,18 +387,11 @@ class _AddOrderScreenState extends State<AddOrderScreen>
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_outlined,
-            color: kPrimary, size: 20),
+        icon: const Icon(Icons.arrow_back_ios_new_outlined, color: kPrimary, size: 20),
         onPressed: () => Navigator.maybePop(context),
       ),
-      title: Text(
-        'Add New Order',
-        style: GoogleFonts.inter(
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-          color: kPrimary,
-        ),
-      ),
+      title: Text('Add New Order',
+          style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: kPrimary)),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: Colors.grey.shade100),
@@ -351,10 +399,72 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     );
   }
 
+  Widget _buildStepper() {
+    final steps = ['Customer', 'Type', 'Measure', 'Details'];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(steps.length, (i) {
+          final isPast = i < _currentStep;
+          final isCurrent = i == _currentStep;
+          return Expanded(
+            child: Row(
+              children: [
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isPast || isCurrent ? kAccent : Colors.grey.shade200,
+                      ),
+                      child: Center(
+                        child: isPast
+                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                            : Text(
+                                '${i + 1}',
+                                style: GoogleFonts.inter(
+                                  color: isCurrent ? Colors.white : Colors.grey.shade600,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      steps[i],
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                        color: isPast || isCurrent ? kPrimary : Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+                if (i != steps.length - 1)
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      margin: const EdgeInsets.only(bottom: 16, left: 4, right: 4),
+                      color: isPast ? kAccent : Colors.grey.shade200,
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────────
-  //  STEP 1 — Order Details
+  //  STEP 1 — Customer Details
   // ─────────────────────────────────────────────────────────────────
-  Widget _buildStep1() {
+  Widget _buildStep1Customer() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
@@ -362,104 +472,144 @@ class _AddOrderScreenState extends State<AddOrderScreen>
         key: _formKey1,
         child: Column(
           children: [
-            // 1. SELECT CUSTOMER
             _SectionCard(
-              title: 'Select Customer',
+              title: 'Customer Details',
               child: Column(
                 children: [
-                  _buildSearchField(),
-                  const SizedBox(height: 12),
-                  _buildCustomerList(),
+                  _InputField(
+                    controller: _idCtrl,
+                    label: 'Customer ID',
+                    hint: 'e.g. 101',
+                    icon: Icons.badge_outlined,
+                    readOnly: true,
+                  ),
                   const SizedBox(height: 16),
+                  _InputField(
+                    controller: _nameCtrl,
+                    label: 'Full Name',
+                    hint: 'e.g. Ahmed Ali',
+                    icon: Icons.person_outline,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _InputField(
+                    controller: _phoneCtrl,
+                    label: 'Phone Number',
+                    hint: '+92 300 1234567',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  _InputField(
+                    controller: _addrCtrl,
+                    label: 'Address (Optional)',
+                    hint: 'Street, City',
+                    icon: Icons.location_on_outlined,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const AddCustomerScreen(),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.person_add_outlined,
-                          color: kAccent, size: 18),
+                      onPressed: _showExistingCustomerModal,
+                      icon: const Icon(Icons.people_alt_outlined, color: kAccent, size: 18),
                       label: Text(
-                        'Add New Customer',
-                        style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: kAccent),
+                        'Select Existing Customer',
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: kAccent),
                       ),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: kAccent),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(kR)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            // 2. ORDER INFO
+            const SizedBox(height: 32),
+            _buildNavButtons(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  //  STEP 2 — Customer Type
+  // ─────────────────────────────────────────────────────────────────
+  Widget _buildStep2Type() {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      child: Column(
+        children: [
+          _SectionCard(
+            title: 'Customer Type',
+            child: Row(
+              children: [
+                Expanded(
+                  child: RadioListTile<bool>(
+                    title: Text('Adult', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500)),
+                    value: true,
+                    groupValue: _isAdult,
+                    activeColor: kAccent,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (v) => setState(() => _isAdult = v!),
+                  ),
+                ),
+                Expanded(
+                  child: RadioListTile<bool>(
+                    title: Text('Child', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500)),
+                    value: false,
+                    groupValue: _isAdult,
+                    activeColor: kAccent,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (v) => setState(() => _isAdult = v!),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          _buildNavButtons(),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  //  STEP 3 — Order Details
+  // ─────────────────────────────────────────────────────────────────
+  Widget _buildStep3Order() {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      child: Form(
+        key: _formKey3,
+        child: Column(
+          children: [
             _SectionCard(
-              title: 'Order Details',
+              title: 'General Details',
               child: Column(
                 children: [
-                  _buildDropdownField(),
-                  const SizedBox(height: 16),
-                  _InputField(
-                    controller: _fabricNotesCtrl,
-                    label: 'Fabric Notes',
-                    hint: 'Color, brand, etc.',
-                    icon: Icons.notes_outlined,
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 16),
                   _InputField(
                     controller: _quantityCtrl,
                     label: 'Quantity',
                     hint: '1',
-                    icon: Icons.numbers_outlined,
+                    icon: Icons.format_list_numbered,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Quantity required'
-                        : null,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _DatePickerField(
-                          label: 'Order Date',
-                          date: _orderDate,
-                          onTap: () => _selectDate(context, false),
-                          validator: (v) =>
-                              _orderDate == null ? 'Required' : null,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _DatePickerField(
-                          label: 'Delivery Date',
-                          date: _deliveryDate,
-                          onTap: () => _selectDate(context, true),
-                          validator: (v) =>
-                              _deliveryDate == null ? 'Required' : null,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildDatePickerRow('Order Date', _orderDate, () => _selectDate(false)),
                   const SizedBox(height: 16),
-                  _buildPrioritySelector(),
+                  _buildDatePickerRow('Delivery Date', _deliveryDate, () => _selectDate(true)),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            // 3. PRICING
+            const SizedBox(height: 24),
             _SectionCard(
               title: 'Pricing',
               child: Column(
@@ -468,687 +618,438 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     controller: _totalCtrl,
                     label: 'Total Amount (PKR)',
                     hint: '0',
-                    icon: Icons.payments_outlined,
+                    icon: Icons.money,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Amount required'
-                        : null,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
                   _InputField(
                     controller: _advanceCtrl,
                     label: 'Advance Paid (PKR)',
                     hint: '0',
-                    icon: Icons.money_outlined,
+                    icon: Icons.account_balance_wallet_outlined,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                   const SizedBox(height: 16),
-                  _buildRemainingBalance(),
-                  const SizedBox(height: 16),
-                  _InputField(
-                    controller: _notesCtrl,
-                    label: 'Special Notes (Optional)',
-                    hint: 'Any special requests',
-                    icon: Icons.edit_note_outlined,
-                    maxLines: 2,
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: kBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Remaining Balance',
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextPri)),
+                        Text('PKR ${_remainingBalance.toStringAsFixed(0)}',
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.bold, color: kAccent, fontSize: 16)),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 28),
-            // Next button
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _nextStep,
-                icon: const Icon(Icons.arrow_forward_outlined,
-                    color: Colors.white, size: 18),
-                label: Text(
-                  'Next',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kAccent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(kR)),
-                  elevation: 0,
-                ),
-              ),
-            ),
+            const SizedBox(height: 32),
+            _buildNavButtons(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSearchField() {
-    return TextField(
-      controller: _searchCtrl,
-      style: GoogleFonts.inter(fontSize: 14),
-      decoration: InputDecoration(
-        hintText: 'Search customer...',
-        hintStyle: GoogleFonts.inter(color: kTextSec, fontSize: 13),
-        prefixIcon: const Icon(Icons.search, color: kTextSec, size: 20),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(kR),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+  Widget _buildDatePickerRow(String label, DateTime? date, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: kBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(kR),
-          borderSide: const BorderSide(color: kAccent, width: 2),
-        ),
-        filled: true,
-        fillColor: kBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-      ),
-      onChanged: (val) => setState(() {}),
-    );
-  }
-
-  Widget _buildCustomerList() {
-    final filtered = _customers
-        .where((c) =>
-            c.name.toLowerCase().contains(_searchCtrl.text.toLowerCase()) ||
-            c.phone.contains(_searchCtrl.text))
-        .toList();
-
-    return Container(
-      constraints: const BoxConstraints(maxHeight: 200),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade200),
-        borderRadius: BorderRadius.circular(kR),
-      ),
-      child: filtered.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text('No customers found',
-                    style: GoogleFonts.inter(color: kTextSec, fontSize: 13)),
-              ),
-            )
-          : ListView.separated(
-              shrinkWrap: true,
-              itemCount: filtered.length,
-              separatorBuilder: (ctx, i) =>
-                  Divider(height: 1, color: Colors.grey.shade200),
-              itemBuilder: (ctx, i) {
-                final c = filtered[i];
-                final isSelected = _selectedCustomer?.id == c.id;
-                return InkWell(
-                  onTap: () => setState(() => _selectedCustomer = c),
-                  borderRadius: i == 0
-                      ? const BorderRadius.vertical(top: Radius.circular(kR))
-                      : i == filtered.length - 1
-                          ? const BorderRadius.vertical(
-                              bottom: Radius.circular(kR))
-                          : BorderRadius.zero,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(12),
-                    color: isSelected
-                        ? kAccent.withValues(alpha: 0.1)
-                        : Colors.transparent,
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor:
-                              isSelected ? kAccent : Colors.grey.shade200,
-                          child: Text(
-                            c.name.substring(0, 1),
-                            style: GoogleFonts.inter(
-                              color: isSelected ? Colors.white : kTextSec,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                c.name,
-                                style: GoogleFonts.inter(
-                                  fontWeight: FontWeight.bold,
-                                  color: kPrimary,
-                                ),
-                              ),
-                              Text(
-                                c.phone,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: kTextSec,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                          color: isSelected ? kAccent : kTextSec,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-    );
-  }
-
-  Widget _buildDropdownField() {
-    return DropdownButtonFormField<String>(
-      initialValue: _garmentType,
-      items: _garmentTypes.map((type) {
-        return DropdownMenuItem(value: type, child: Text(type));
-      }).toList(),
-      onChanged: (v) => setState(() => _garmentType = v),
-      validator: (v) => v == null ? 'Please select a garment type' : null,
-      style: GoogleFonts.inter(fontSize: 14, color: kTextPri),
-      icon: const Icon(Icons.keyboard_arrow_down, color: kTextSec),
-      decoration: InputDecoration(
-        labelText: 'Garment Type',
-        labelStyle: GoogleFonts.inter(color: kTextSec, fontSize: 13),
-        prefixIcon: const Icon(Icons.checkroom_outlined, color: kTextSec, size: 20),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(kR),
-          borderSide: BorderSide(color: Colors.grey.shade200),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(kR),
-          borderSide: const BorderSide(color: kAccent, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(kR),
-          borderSide: const BorderSide(color: Colors.red),
-        ),
-        filled: true,
-        fillColor: kCard,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-    );
-  }
-
-  Widget _buildPrioritySelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Priority',
-            style: GoogleFonts.inter(fontSize: 13, color: kTextSec)),
-        const SizedBox(height: 8),
-        Row(
+        child: Row(
           children: [
-            _PriorityChip(
-              label: 'Low',
-              color: kTextSec,
-              isSelected: _priority == 'Low',
-              onTap: () => setState(() => _priority = 'Low'),
-            ),
-            const SizedBox(width: 8),
-            _PriorityChip(
-              label: 'Medium',
-              color: Colors.orange,
-              isSelected: _priority == 'Medium',
-              onTap: () => setState(() => _priority = 'Medium'),
-            ),
-            const SizedBox(width: 8),
-            _PriorityChip(
-              label: 'High',
-              color: Colors.red,
-              isSelected: _priority == 'High',
-              onTap: () => setState(() => _priority = 'High'),
+            const Icon(Icons.calendar_today_outlined, color: kTextSec, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: GoogleFonts.inter(fontSize: 12, color: kTextSec)),
+                  const SizedBox(height: 4),
+                  Text(
+                    date != null ? DateFormat('dd MMM, yyyy').format(date) : 'Select date',
+                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: kTextPri),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildRemainingBalance() {
-    final bal = _remainingBalance;
-    final color = bal > 0 ? Colors.red.shade400 : kAccent;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(kR),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Remaining Balance',
-            style: GoogleFonts.inter(
-                fontSize: 14, fontWeight: FontWeight.w600, color: kTextPri),
-          ),
-          Text(
-            'Rs. ${bal.toStringAsFixed(0)}',
-            style: GoogleFonts.inter(
-                fontSize: 16, fontWeight: FontWeight.bold, color: color),
-          ),
-        ],
       ),
     );
   }
 
   // ─────────────────────────────────────────────────────────────────
-  //  STEP 2 — Measurements
+  //  STEP 4 — Measurements
   // ─────────────────────────────────────────────────────────────────
-  Widget _buildStep2() {
+  Widget _buildStep4Measurements() {
+    final bool isAutoFilled = _selectedCustomer != null;
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: _hasLoadedMeasurements
-                ? _InfoBanner(
-                    text: 'Measurements loaded from customer profile.',
-                    color: kAccent,
-                    icon: Icons.check_circle_outline,
-                  )
-                : _InfoBanner(
-                    text: 'No measurements found, please fill in.',
-                    color: Colors.orange,
-                    icon: Icons.info_outline,
+          // ── Auto-fill banner + toggle ──
+          if (isAutoFilled) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: _measurementsLocked ? kAccent.withValues(alpha: 0.1) : kPrimary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: _measurementsLocked ? kAccent.withValues(alpha: 0.3) : kPrimary.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _measurementsLocked ? Icons.lock_outline : Icons.edit_outlined,
+                    color: _measurementsLocked ? kAccent : kPrimary,
+                    size: 20,
                   ),
-          ),
-          const SizedBox(height: 16),
-          // ── Measurements card ──
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _measurementsLocked ? 'Auto-filled from saved data' : 'Edit Mode',
+                          style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _measurementsLocked ? kAccent : kPrimary),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _measurementsLocked
+                              ? 'Measurements are locked.'
+                              : 'Measurements unlocked.',
+                          style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: _measurementsLocked ? Colors.green.shade700 : kTextSec),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: !_measurementsLocked,
+                    onChanged: (val) {
+                      setState(() {
+                        _measurementsLocked = !val;
+                      });
+                    },
+                    activeTrackColor: kPrimary.withValues(alpha: 0.5),
+                    inactiveThumbColor: kAccent,
+                    inactiveTrackColor: kAccent.withValues(alpha: 0.3),
+                  )
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
           _SectionCard(
             title: 'Measurements',
-            trailing: _buildUnitToggle(),
             child: Column(
               children: [
-                if (_hasLoadedMeasurements)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Update Measurements',
-                          style: GoogleFonts.inter(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: kPrimary)),
-                      Switch(
-                        value: _updateMeasurements,
-                        onChanged: (v) => setState(() => _updateMeasurements = v),
-                        activeTrackColor: kAccent,
-                        activeThumbColor: Colors.white,
-                      ),
-                    ],
-                  ),
-                if (_hasLoadedMeasurements) const SizedBox(height: 16),
-                ..._measureCtrl.entries.map((entry) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _MeasurementRow(
-                      label: entry.key,
-                      controller: entry.value,
-                      unit: _isInches ? 'in' : 'cm',
-                      readOnly: !_updateMeasurements,
-                      onChanged: () => setState(() {}),
+                // 1. Length
+                _buildCompactMeasureField('Length', _lengthCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                
+                // 2. Arm + Mundo
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(child: _buildCompactMeasureField('Arm', _armCtrl, readOnly: _measurementsLocked)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildOptionCheckbox('Mundo', _optMundo, _measurementsLocked ? null : (v) => setState(() => _optMundo = v)),
                     ),
-                  );
-                }),
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 3. Shoulder
+                _buildCompactMeasureField('Shoulder', _shoulderCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 4. Collar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCompactMeasureField('Collar', _collarCtrl, readOnly: _measurementsLocked),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: _buildOptionCheckbox('Regular', _colRegular, _measurementsLocked ? null : (v) => setState(() => _colRegular = v))),
+                        Expanded(child: _buildOptionCheckbox('French', _colFrench, _measurementsLocked ? null : (v) => setState(() => _colFrench = v))),
+                        Expanded(child: _buildOptionCheckbox('Sherwani', _colSherwani, _measurementsLocked ? null : (v) => setState(() => _colSherwani = v))),
+                      ],
+                    ),
+                    if (_colSherwani) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: Text('Half', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                              value: 'Half',
+                              groupValue: _sherwaniType,
+                              onChanged: _measurementsLocked ? null : (v) => setState(() => _sherwaniType = v!),
+                              activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: Text('Full', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                              value: 'Full',
+                              groupValue: _sherwaniType,
+                              onChanged: _measurementsLocked ? null : (v) => setState(() => _sherwaniType = v!),
+                              activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ]
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 5. Chest
+                _buildCompactMeasureField('Chest', _chestCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 6. Waist
+                _buildCompactMeasureField('Waist', _waistCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 7. Hip
+                _buildCompactMeasureField('Hip', _hipCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 8. Shalwar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCompactMeasureField('Shalwar', _shalwarCtrl, readOnly: _measurementsLocked),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: _buildOptionCheckbox('Kanto', _shalKanto, _measurementsLocked ? null : (v) => setState(() => _shalKanto = v))),
+                        Expanded(child: _buildOptionCheckbox('Zip Pocket', _shalZipPocket, _measurementsLocked ? null : (v) => setState(() => _shalZipPocket = v))),
+                        Expanded(child: _buildOptionCheckbox('Width', _shalWidth, _measurementsLocked ? null : (v) => setState(() => _shalWidth = v))),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 9. Bottom
+                _buildCompactMeasureField('Bottom', _bottomCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 10. Plate
+                _buildCompactMeasureField('Plate', _plateCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 11. Front Pocket
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildOptionCheckbox('Front Pocket', _optFrontPocket, _measurementsLocked ? null : (v) => setState(() => _optFrontPocket = v)),
+                    ),
+                    if (_optFrontPocket)
+                      Expanded(
+                        flex: 1,
+                        child: _buildCompactMeasureField('', _frontPocketCtrl, readOnly: _measurementsLocked),
+                      )
+                    else
+                      const Spacer(),
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 12. Side Pocket
+                _buildOptionCheckbox('Side Pocket', _optSidePocket, _measurementsLocked ? null : (v) => setState(() => _optSidePocket = v)),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 13. Cuff
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Cuff', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 0,
+                      children: ['Round', 'Double kaj', 'Double', 'Square'].map((type) {
+                        return SizedBox(
+                          width: 140,
+                          child: RadioListTile<String>(
+                            title: Text(type, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                            value: type,
+                            groupValue: _cuffType,
+                            onChanged: _measurementsLocked ? null : (v) => setState(() => _cuffType = v!),
+                            activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 14. Extra
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Extra', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: _extraCtrl,
+                      readOnly: _measurementsLocked,
+                      maxLines: 3,
+                      style: GoogleFonts.inter(fontSize: 14, color: _measurementsLocked ? kTextSec : kTextPri),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: _measurementsLocked ? Colors.grey.shade100 : kBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: _measurementsLocked ? Colors.grey.shade300 : Colors.grey.shade200),
+                        ),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kAccent)),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          // ── Additional Options card ──
-          _SectionCard(
-            title: 'Additional Options',
-            child: _buildCheckboxGrid(),
-          ),
-          const SizedBox(height: 28),
-          // ── Bottom Buttons ──
-          Row(
-            children: [
-              Expanded(
-                flex: 1,
-                child: SizedBox(
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: _prevStep,
-                    icon: const Icon(Icons.arrow_back_outlined,
-                        color: kPrimary, size: 18),
-                    label: Text(
-                      'Back',
-                      style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: kPrimary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: kPrimary),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(kR)),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _confirmOrder,
-                    icon: const Icon(Icons.check_circle_outline,
-                        color: Colors.white, size: 18),
-                    label: Text(
-                      'Confirm Order',
-                      style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kAccent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(kR)),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+
+          const SizedBox(height: 32),
+          _buildNavButtons(),
         ],
       ),
     );
   }
 
-  Widget _buildUnitToggle() {
-    return Container(
-      decoration: BoxDecoration(
-        color: kBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _UnitChip(
-            label: 'cm',
-            active: !_isInches,
-            onTap: () => setState(() => _isInches = false),
-          ),
-          _UnitChip(
-            label: 'in',
-            active: _isInches,
-            onTap: () => setState(() => _isInches = true),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCheckboxGrid() {
-    final keys = _optionsMap.keys.toList();
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 3.8,
-      children: keys.map((key) {
-        return _AnimatedCheckbox(
-          label: key,
-          checked: _optionsMap[key]!,
-          readOnly: !_updateMeasurements,
-          onChanged: (val) {
-            if (!_updateMeasurements) return;
-            setState(() {
-              _optionsMap[key] = val;
-            });
-          },
-        );
-      }).toList(),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-//  Reusable Widgets below (similar to AddCustomer)
-// ─────────────────────────────────────────────────────────────────
-
-class _PriorityChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PriorityChip({
-    required this.label,
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(kR),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.1) : kBg,
-            border: Border.all(
-              color: isSelected ? color : Colors.grey.shade200,
-              width: isSelected ? 2 : 1,
-            ),
-            borderRadius: BorderRadius.circular(kR),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                color: isSelected ? color : kTextSec,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime? date;
-  final VoidCallback onTap;
-  final FormFieldValidator<String>? validator;
-
-  const _DatePickerField({
-    required this.label,
-    required this.date,
-    required this.onTap,
-    this.validator,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: IgnorePointer(
-        child: TextFormField(
-          key: ValueKey(date),
-          initialValue: date != null ? DateFormat('MMM dd, yyyy').format(date!) : null,
-          validator: validator,
-          style: GoogleFonts.inter(fontSize: 14, color: kTextPri),
-          decoration: InputDecoration(
-            labelText: label,
-            labelStyle: GoogleFonts.inter(color: kTextSec, fontSize: 13),
-            hintText: 'Select',
-            hintStyle: GoogleFonts.inter(color: kTextSec, fontSize: 13),
-            prefixIcon:
-                const Icon(Icons.calendar_today_outlined, color: kTextSec, size: 20),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kR),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(kR),
-              borderSide: const BorderSide(color: Colors.red),
-            ),
-            filled: true,
-            fillColor: kCard,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _InfoBanner extends StatelessWidget {
-  final String text;
-  final Color color;
-  final IconData icon;
-
-  const _InfoBanner({
-    required this.text,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(kR),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: color,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepIndicator extends StatelessWidget {
-  final int currentStep;
-
-  const _StepIndicator({required this.currentStep});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Row(
-        children: [
-          _StepCircle(index: 0, currentStep: currentStep, label: 'Order Details'),
-          Expanded(
-            child: Container(
-              height: 2,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: currentStep >= 1
-                      ? [kAccent, kAccent]
-                      : [kAccent, Colors.grey.shade300],
-                ),
-              ),
-            ),
-          ),
-          _StepCircle(index: 1, currentStep: currentStep, label: 'Measurements'),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepCircle extends StatelessWidget {
-  final int index;
-  final int currentStep;
-  final String label;
-
-  const _StepCircle({
-    required this.index,
-    required this.currentStep,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isCompleted = currentStep > index;
-    final isActive = currentStep == index;
-
+  Widget _buildCompactMeasureField(String label, TextEditingController ctrl, {bool readOnly = false}) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: 40,
+        if (label.isNotEmpty) ...[
+          Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+          const SizedBox(height: 4),
+        ],
+        SizedBox(
           height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: (isCompleted || isActive) ? kAccent : Colors.transparent,
-            border: Border.all(
-              color: (isCompleted || isActive) ? kAccent : kTextSec,
-              width: 2,
+          child: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.text,
+            readOnly: readOnly,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: readOnly ? kTextSec : kTextPri,
             ),
-          ),
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: isCompleted
-                  ? const Icon(Icons.check,
-                      color: Colors.white, size: 20, key: ValueKey('check'))
-                  : Text(
-                      '${index + 1}',
-                      key: ValueKey('num$index'),
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: isActive ? Colors.white : kTextSec,
-                      ),
-                    ),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              filled: true,
+              fillColor: readOnly ? Colors.grey.shade100 : kBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: readOnly ? Colors.grey.shade300 : Colors.grey.shade200,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: kAccent),
+              ),
+              suffixIcon: readOnly
+                  ? const Icon(Icons.lock_outline, size: 14, color: kTextSec)
+                  : null,
             ),
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-            color: isActive ? kPrimary : kTextSec,
+      ],
+    );
+  }
+
+  Widget _buildOptionCheckbox(String title, bool value, ValueChanged<bool>? onChanged) {
+    return CheckboxListTile(
+      title: Text(title, style: GoogleFonts.inter(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: onChanged == null ? kTextSec : kTextPri,
+      )),
+      value: value,
+      onChanged: onChanged != null ? (v) => onChanged(v!) : null,
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      activeColor: kAccent,
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────
+  //  Shared UI
+  // ─────────────────────────────────────────────────────────────────
+  Widget _buildNavButtons() {
+    return Row(
+      children: [
+        if (_currentStep > 0) ...[
+          Expanded(
+            flex: 1,
+            child: OutlinedButton(
+              onPressed: _prevStep,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                side: BorderSide(color: Colors.grey.shade300),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+              ),
+              child: Text('Back', style: GoogleFonts.inter(fontSize: 16, color: kTextPri)),
+            ),
+          ),
+          const SizedBox(width: 16),
+        ],
+        Expanded(
+          flex: 2,
+          child: ElevatedButton(
+            onPressed: _nextStep,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: kAccent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+            ),
+            child: Text(
+              _currentStep == 3 ? 'Confirm Order' : 'Next Step',
+              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
         ),
       ],
@@ -1156,56 +1057,35 @@ class _StepCircle extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────
+//  Helper Widgets
+// ─────────────────────────────────────────────────────────────────
 class _SectionCard extends StatelessWidget {
   final String title;
-  final Widget? trailing;
   final Widget child;
 
-  const _SectionCard({
-    required this.title,
-    this.trailing,
-    required this.child,
-  });
+  const _SectionCard({required this.title, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: kCard,
         borderRadius: BorderRadius.circular(kR),
         boxShadow: [
           BoxShadow(
             color: kTextPri.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: kPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ?trailing,
-            ],
-          ),
+          Text(title, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimary)),
           const SizedBox(height: 20),
           child,
         ],
@@ -1214,259 +1094,59 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
-class _InputField extends StatefulWidget {
+class _InputField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final String hint;
-  final IconData icon;
+  final IconData? icon;
   final TextInputType keyboardType;
-  final List<TextInputFormatter> inputFormatters;
-  final int maxLines;
   final String? Function(String?)? validator;
+  final int maxLines;
+  final bool readOnly;
 
   const _InputField({
     required this.controller,
     required this.label,
     required this.hint,
-    required this.icon,
+    this.icon,
     this.keyboardType = TextInputType.text,
-    this.inputFormatters = const [],
-    this.maxLines = 1,
     this.validator,
-  });
-
-  @override
-  State<_InputField> createState() => _InputFieldState();
-}
-
-class _InputFieldState extends State<_InputField> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      onFocusChange: (f) => setState(() => _focused = f),
-      child: TextFormField(
-        controller: widget.controller,
-        keyboardType: widget.keyboardType,
-        inputFormatters: widget.inputFormatters,
-        maxLines: widget.maxLines,
-        validator: widget.validator,
-        style: GoogleFonts.inter(fontSize: 14, color: kTextPri),
-        decoration: InputDecoration(
-          labelText: widget.label,
-          hintText: widget.hint,
-          labelStyle: GoogleFonts.inter(
-            color: _focused ? kAccent : kTextSec,
-            fontSize: 13,
-          ),
-          hintStyle: GoogleFonts.inter(color: kTextSec, fontSize: 13),
-          prefixIcon: Icon(widget.icon,
-              color: _focused ? kAccent : kTextSec, size: 20),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(kR),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(kR),
-            borderSide: const BorderSide(color: kAccent, width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(kR),
-            borderSide: const BorderSide(color: Colors.red),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(kR),
-            borderSide: const BorderSide(color: Colors.red, width: 2),
-          ),
-          filled: true,
-          fillColor: kCard,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-      ),
-    );
-  }
-}
-
-class _MeasurementRow extends StatefulWidget {
-  final String label;
-  final TextEditingController controller;
-  final String unit;
-  final bool readOnly;
-  final VoidCallback onChanged;
-
-  const _MeasurementRow({
-    required this.label,
-    required this.controller,
-    required this.unit,
+    this.maxLines = 1,
     this.readOnly = false,
-    required this.onChanged,
   });
 
   @override
-  State<_MeasurementRow> createState() => _MeasurementRowState();
-}
-
-class _MeasurementRowState extends State<_MeasurementRow> {
-  bool _focused = false;
-
-  @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Label
-        Expanded(
-          flex: 3,
-          child: Text(
-            widget.label,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: widget.readOnly ? kTextSec : kTextPri,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Number input
-        Expanded(
-          flex: 2,
-          child: Focus(
-            onFocusChange: (f) {
-              if (!widget.readOnly) setState(() => _focused = f);
-            },
-            child: TextFormField(
-              controller: widget.controller,
-              readOnly: widget.readOnly,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))
-              ],
-              onChanged: (_) => widget.onChanged(),
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: widget.readOnly ? kTextSec : kTextPri),
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                hintText: widget.unit,
-                hintStyle: GoogleFonts.inter(fontSize: 12, color: kTextSec),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(kR),
-                  borderSide: BorderSide(
-                      color: widget.readOnly
-                          ? Colors.grey.shade100
-                          : Colors.grey.shade200),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(kR),
-                  borderSide: BorderSide(
-                      color: widget.readOnly ? Colors.grey.shade200 : kAccent,
-                      width: widget.readOnly ? 1 : 2),
-                ),
-                filled: true,
-                fillColor: widget.readOnly
-                    ? Colors.grey.shade50
-                    : (_focused ? kAccent.withValues(alpha: 0.04) : kBg),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
+        Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: kTextPri)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          readOnly: readOnly,
+          validator: validator,
+          style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.inter(color: Colors.grey.shade400, fontWeight: FontWeight.w400),
+            prefixIcon: icon != null ? Icon(icon, color: kTextSec, size: 20) : null,
+            filled: true,
+            fillColor: kBg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kAccent, width: 1.5)),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade300)),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade400, width: 1.5)),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AnimatedCheckbox extends StatelessWidget {
-  final String label;
-  final bool checked;
-  final bool readOnly;
-  final ValueChanged<bool> onChanged;
-
-  const _AnimatedCheckbox({
-    required this.label,
-    required this.checked,
-    this.readOnly = false,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: readOnly ? null : () => onChanged(!checked),
-      child: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: checked
-                  ? (readOnly ? Colors.grey.shade400 : kAccent)
-                  : Colors.transparent,
-              border: Border.all(
-                color: checked
-                    ? (readOnly ? Colors.grey.shade400 : kAccent)
-                    : (readOnly ? Colors.grey.shade300 : kTextSec),
-                width: 2,
-              ),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: AnimatedOpacity(
-              opacity: checked ? 1 : 0,
-              duration: const Duration(milliseconds: 150),
-              child: const Icon(Icons.check, color: Colors.white, size: 14),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: checked ? (readOnly ? kTextSec : kPrimary) : kTextSec,
-                fontWeight: checked ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _UnitChip extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _UnitChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? kAccent : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: active ? Colors.white : kTextSec,
-          ),
-        ),
-      ),
     );
   }
 }

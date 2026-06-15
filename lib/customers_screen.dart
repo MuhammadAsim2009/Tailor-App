@@ -55,13 +55,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   final List<CustomerModel> _allCustomers = [
-    CustomerModel(id: 'C-001', name: 'Ahmed Ali',    phone: '+92 300 1234567', totalOrders: 12, pendingDues: 0),
-    CustomerModel(id: 'C-002', name: 'Sara Khan',    phone: '+92 321 7654321', totalOrders: 4,  pendingDues: 1500),
-    CustomerModel(id: 'C-003', name: 'Usman Tariq',  phone: '+92 333 1122334', totalOrders: 8,  pendingDues: 0),
-    CustomerModel(id: 'C-004', name: 'Aisha Bibi',   phone: '+92 345 9988776', totalOrders: 2,  pendingDues: 5000),
-    CustomerModel(id: 'C-005', name: 'Bilal Malik',  phone: '+92 301 5566778', totalOrders: 15, pendingDues: 2500),
-    CustomerModel(id: 'C-006', name: 'Nadia Iqbal',  phone: '+92 302 4433221', totalOrders: 1,  pendingDues: 0),
-    CustomerModel(id: 'C-007', name: 'Kamran Shah',  phone: '+92 313 7788990', totalOrders: 20, pendingDues: 8000),
+    CustomerModel(id: '101', name: 'Ahmed Ali',    phone: '+92 300 1234567', totalOrders: 12, pendingDues: 0),
+    CustomerModel(id: '102', name: 'Sara Khan',    phone: '+92 321 7654321', totalOrders: 4,  pendingDues: 1500),
+    CustomerModel(id: '103', name: 'Usman Tariq',  phone: '+92 333 1122334', totalOrders: 8,  pendingDues: 0),
+    CustomerModel(id: '104', name: 'Aisha Bibi',   phone: '+92 345 9988776', totalOrders: 2,  pendingDues: 5000),
+    CustomerModel(id: '105', name: 'Bilal Malik',  phone: '+92 301 5566778', totalOrders: 15, pendingDues: 2500),
+    CustomerModel(id: '106', name: 'Nadia Iqbal',  phone: '+92 302 4433221', totalOrders: 1,  pendingDues: 0),
+    CustomerModel(id: '107', name: 'Kamran Shah',  phone: '+92 313 7788990', totalOrders: 20, pendingDues: 8000),
   ];
 
   List<CustomerModel> get _filteredCustomers {
@@ -221,9 +221,25 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        customer.name,
-                        style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPrimary),
+                      Row(
+                        children: [
+                          Text(
+                            customer.name,
+                            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPrimary),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: kPrimaryColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '#${customer.id}',
+                              style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: kPrimaryColor),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Row(
@@ -373,9 +389,26 @@ class CustomerProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            customer.name,
-            style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                customer.name,
+                style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '#${customer.id}',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           Text(
@@ -398,15 +431,31 @@ class CustomerProfileScreen extends StatelessWidget {
     return _buildBaseCard(
       child: Column(
         children: [
-          _buildMeasurementRow('Shirt Length', '38"'),
-          const Divider(height: 24),
-          _buildMeasurementRow('Shoulder', '18.5"'),
-          const Divider(height: 24),
-          _buildMeasurementRow('Chest', '40"'),
-          const Divider(height: 24),
-          _buildMeasurementRow('Sleeves', '24"'),
-          const Divider(height: 24),
-          _buildMeasurementRow('Trouser Length', '39"'),
+          _buildMeasurementRow('Length', '40"'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Arm', '24" (Mundo)'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Shoulder', '18"'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Collar', '15" (Regular)'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Chest', '42"'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Waist', '34"'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Hip', '40"'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Shalwar', '38" (Width)'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Bottom', '14"'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Plate', 'Yes'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Pockets', 'Front, Side'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Cuff', 'Round'),
+          const Divider(height: 16),
+          _buildMeasurementRow('Extra', 'Tight fit on waist'),
         ],
       ),
     );

@@ -22,7 +22,6 @@ class EditOrderScreen extends StatefulWidget {
 class _EditOrderScreenState extends State<EditOrderScreen> {
   final PageController _pageController = PageController();
   final _formKey1 = GlobalKey<FormState>();
-  final _formKey2 = GlobalKey<FormState>();
 
   int _currentStep = 0;
 
@@ -31,77 +30,68 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
   final String _customerPhone = "+92 300 1234567";
 
   String _status = 'In Progress';
-  String _garmentType = '3-Piece Suit';
-  String _priority = 'High';
   String _unit = 'inches';
 
-  final TextEditingController _fabricNotesCtrl = TextEditingController(text: 'Navy Blue Worsted Wool, imported. Client provided fabric 4 meters.');
-  final TextEditingController _specialNotesCtrl = TextEditingController(text: 'Tight fit on the waist, wide leg pants as per reference image.');
-  final TextEditingController _quantityCtrl = TextEditingController(text: '2');
-  final TextEditingController _orderDateCtrl = TextEditingController(text: '01 Jun 2026');
-  final TextEditingController _deliveryDateCtrl = TextEditingController(text: '12 Jun 2026');
-
-  final TextEditingController _totalAmountCtrl = TextEditingController(text: '5000');
-  final TextEditingController _advancePaidCtrl = TextEditingController(text: '2000');
-
-  // Measurements
-  final TextEditingController _lenCtrl = TextEditingController(text: '40');
-  final TextEditingController _armCtrl = TextEditingController(text: '24');
-  final TextEditingController _shouldersCtrl = TextEditingController(text: '18');
-  final TextEditingController _collarCtrl = TextEditingController(text: '15.5');
-  final TextEditingController _halfSherwaniCtrl = TextEditingController(text: '');
-  final TextEditingController _chestCtrl = TextEditingController(text: '42');
-  final TextEditingController _waistCtrl = TextEditingController(text: '34');
-  final TextEditingController _hipCtrl = TextEditingController(text: '40');
-  final TextEditingController _shalwarCtrl = TextEditingController(text: '38');
-  final TextEditingController _bottomCtrl = TextEditingController(text: '14');
-
-  bool _optPlate = true;
+  // --- 14-Point Measurement State ---
+  bool _measurementsLocked = false;
+  final _lengthCtrl = TextEditingController(text: '40');
+  final _armCtrl = TextEditingController(text: '24');
+  bool _optMundo = false;
+  final _shoulderCtrl = TextEditingController(text: '18');
+  final _collarCtrl = TextEditingController(text: '15');
+  bool _colRegular = true;
+  bool _colFrench = false;
+  bool _colSherwani = false;
+  String _sherwaniType = 'Half';
+  final _chestCtrl = TextEditingController(text: '42');
+  final _waistCtrl = TextEditingController(text: '34');
+  final _hipCtrl = TextEditingController(text: '40');
+  final _shalwarCtrl = TextEditingController(text: '38');
+  bool _shalKanto = false;
+  bool _shalZipPocket = false;
+  bool _shalWidth = false;
+  final _bottomCtrl = TextEditingController(text: '14');
+  final _plateCtrl = TextEditingController(text: '');
   bool _optFrontPocket = true;
-  bool _optCuff = true;
-  bool _optMundho = false;
+  final _frontPocketCtrl = TextEditingController(text: '');
+  bool _optSidePocket = false;
+  String _cuffType = 'Round'; // Round, Double kaj, Double, Square
+  final _extraCtrl = TextEditingController(text: '');
 
-  double get _totalAmount => double.tryParse(_totalAmountCtrl.text) ?? 0;
-  double get _advancePaid => double.tryParse(_advancePaidCtrl.text) ?? 0;
+  double get _totalAmount    => double.tryParse(_totalAmountCtrl.text) ?? 0;
+  double get _advancePaid    => double.tryParse(_advancePaidCtrl.text) ?? 0;
   double get _remainingAmount => _totalAmount - _advancePaid;
 
-  final List<String> _garmentTypes = [
-    'Kurta Shalwar',
-    '2-Piece Suit',
-    '3-Piece Suit',
-    'Sherwani',
-    'Waistcoat',
-    'Formal Pant',
-    'Dress Shirt'
-  ];
+  final List<String> _statuses = ['Pending', 'In Progress', 'Ready', 'Delivered'];
 
-  final List<String> _statuses = [
-    'Pending',
-    'In Progress',
-    'Ready',
-    'Delivered'
-  ];
+  final TextEditingController _specialNotesCtrl = TextEditingController(text: 'Tight fit on the waist.');
+  final TextEditingController _quantityCtrl     = TextEditingController(text: '2');
+  final TextEditingController _orderDateCtrl    = TextEditingController(text: '01 Jun 2026');
+  final TextEditingController _deliveryDateCtrl = TextEditingController(text: '12 Jun 2026');
+  final TextEditingController _totalAmountCtrl  = TextEditingController(text: '5000');
+  final TextEditingController _advancePaidCtrl  = TextEditingController(text: '2000');
 
   @override
   void dispose() {
     _pageController.dispose();
-    _fabricNotesCtrl.dispose();
     _specialNotesCtrl.dispose();
     _quantityCtrl.dispose();
     _orderDateCtrl.dispose();
     _deliveryDateCtrl.dispose();
     _totalAmountCtrl.dispose();
     _advancePaidCtrl.dispose();
-    _lenCtrl.dispose();
+    _lengthCtrl.dispose();
     _armCtrl.dispose();
-    _shouldersCtrl.dispose();
+    _shoulderCtrl.dispose();
     _collarCtrl.dispose();
-    _halfSherwaniCtrl.dispose();
     _chestCtrl.dispose();
     _waistCtrl.dispose();
     _hipCtrl.dispose();
     _shalwarCtrl.dispose();
     _bottomCtrl.dispose();
+    _plateCtrl.dispose();
+    _frontPocketCtrl.dispose();
+    _extraCtrl.dispose();
     super.dispose();
   }
 
@@ -349,6 +339,11 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
+                  'ID: 101',
+                  style: GoogleFonts.inter(fontSize: 13, color: kAccent, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
                   _customerPhone,
                   style: GoogleFonts.inter(fontSize: 13, color: kTextSec),
                 ),
@@ -361,7 +356,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                 context,
                 MaterialPageRoute(builder: (_) => CustomerProfileScreen(
                   customer: CustomerModel(
-                    id: 'C-001',
+                    id: '101',
                     name: _customerName,
                     phone: _customerPhone,
                     totalOrders: 12,
@@ -440,30 +435,6 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DropdownButtonFormField<String>(
-            initialValue: _garmentType,
-            items: _garmentTypes.map((type) {
-              return DropdownMenuItem(value: type, child: Text(type));
-            }).toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _garmentType = v);
-            },
-            decoration: InputDecoration(
-              labelText: 'Garment Type',
-              prefixIcon: const Icon(Icons.checkroom_outlined, size: 20),
-              filled: true,
-              fillColor: kCard,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(kR),
-                borderSide: BorderSide(color: Colors.grey.shade200),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(kR),
-                borderSide: const BorderSide(color: kAccent, width: 2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -499,57 +470,11 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text('Priority', style: GoogleFonts.inter(fontSize: 13, color: kTextSec)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _buildPriorityOption('Low', kTextSec)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildPriorityOption('Medium', Colors.orange)),
-              const SizedBox(width: 8),
-              Expanded(child: _buildPriorityOption('High', Colors.red)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _InputField(
-            controller: _fabricNotesCtrl,
-            label: 'Fabric Notes',
-            icon: Icons.texture_outlined,
-            maxLines: 3,
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildPriorityOption(String label, Color color) {
-    final isSelected = _priority == label;
-    return GestureDetector(
-      onTap: () => setState(() => _priority = label),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.1) : kBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            color: isSelected ? color : kTextSec,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildPricingCard() {
     return _SectionCard(
@@ -625,123 +550,310 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
   Widget _buildStep2() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Form(
-        key: _formKey2,
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Editing existing measurements',
-                    style: GoogleFonts.inter(fontSize: 13, color: Colors.blue[800], fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      child: Column(
+        children: [
+          // Info banner
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.25)),
             ),
-            const SizedBox(height: 16),
-            _SectionCard(
-              title: 'Measurements',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _UnitChip(label: 'cm', active: _unit == 'cm', onTap: () => setState(() => _unit = 'cm')),
-                  const SizedBox(width: 4),
-                  _UnitChip(label: 'inches', active: _unit == 'inches', onTap: () => setState(() => _unit = 'inches')),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _MeasurementRow(label: 'Length', controller: _lenCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Arm', controller: _armCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Shoulders', controller: _shouldersCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Collar', controller: _collarCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Half Sherwani', controller: _halfSherwaniCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Chest', controller: _chestCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Waist', controller: _waistCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Hip', controller: _hipCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Shalwar', controller: _shalwarCtrl, unit: _unit),
-                  const SizedBox(height: 12),
-                  _MeasurementRow(label: 'Bottom', controller: _bottomCtrl, unit: _unit),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _SectionCard(
-              title: 'Additional Options',
-              child: GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                childAspectRatio: 3.5,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                children: [
-                  _AnimatedCheckbox(label: 'Plate', checked: _optPlate, onChanged: (v) => setState(() => _optPlate = v)),
-                  _AnimatedCheckbox(label: 'Front Pocket', checked: _optFrontPocket, onChanged: (v) => setState(() => _optFrontPocket = v)),
-                  _AnimatedCheckbox(label: 'Cuff', checked: _optCuff, onChanged: (v) => setState(() => _optCuff = v)),
-                  _AnimatedCheckbox(label: 'Mundho', checked: _optMundho, onChanged: (v) => setState(() => _optMundho = v)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            Row(
+            child: Row(
               children: [
-                Expanded(
-                  flex: 1,
-                  child: SizedBox(
-                    height: 54,
-                    child: OutlinedButton(
-                      onPressed: _prevStep,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: kTextPri,
-                        side: BorderSide(color: Colors.grey.shade300, width: 2),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
-                      ),
-                      child: Text('← Back', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                const SizedBox(width: 8),
+                Text('Editing existing measurements',
+                    style: GoogleFonts.inter(fontSize: 13, color: Colors.blue[800], fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          _SectionCard(
+            title: 'Measurements',
+            child: Column(
+              children: [
+                // 1. Length
+                _buildCompactMeasureField('Length', _lengthCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                
+                // 2. Arm + Mundo
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(child: _buildCompactMeasureField('Arm', _armCtrl, readOnly: _measurementsLocked)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildOptionCheckbox('Mundo', _optMundo, _measurementsLocked ? null : (v) => setState(() => _optMundo = v)),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: SizedBox(
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: _showSaveConfirmation,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kAccent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
-                        elevation: 0,
-                      ),
-                      child: Text('Save Changes', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 3. Shoulder
+                _buildCompactMeasureField('Shoulder', _shoulderCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 4. Collar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCompactMeasureField('Collar', _collarCtrl, readOnly: _measurementsLocked),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: _buildOptionCheckbox('Regular', _colRegular, _measurementsLocked ? null : (v) => setState(() => _colRegular = v))),
+                        Expanded(child: _buildOptionCheckbox('French', _colFrench, _measurementsLocked ? null : (v) => setState(() => _colFrench = v))),
+                        Expanded(child: _buildOptionCheckbox('Sherwani', _colSherwani, _measurementsLocked ? null : (v) => setState(() => _colSherwani = v))),
+                      ],
                     ),
-                  ),
+                    if (_colSherwani) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: Text('Half', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                              value: 'Half',
+                              groupValue: _sherwaniType,
+                              onChanged: _measurementsLocked ? null : (v) => setState(() => _sherwaniType = v!),
+                              activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                          Expanded(
+                            child: RadioListTile<String>(
+                              title: Text('Full', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                              value: 'Full',
+                              groupValue: _sherwaniType,
+                              onChanged: _measurementsLocked ? null : (v) => setState(() => _sherwaniType = v!),
+                              activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ]
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 5. Chest
+                _buildCompactMeasureField('Chest', _chestCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 6. Waist
+                _buildCompactMeasureField('Waist', _waistCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 7. Hip
+                _buildCompactMeasureField('Hip', _hipCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 8. Shalwar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildCompactMeasureField('Shalwar', _shalwarCtrl, readOnly: _measurementsLocked),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: _buildOptionCheckbox('Kanto', _shalKanto, _measurementsLocked ? null : (v) => setState(() => _shalKanto = v))),
+                        Expanded(child: _buildOptionCheckbox('Zip Pocket', _shalZipPocket, _measurementsLocked ? null : (v) => setState(() => _shalZipPocket = v))),
+                        Expanded(child: _buildOptionCheckbox('Width', _shalWidth, _measurementsLocked ? null : (v) => setState(() => _shalWidth = v))),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 9. Bottom
+                _buildCompactMeasureField('Bottom', _bottomCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 10. Plate
+                _buildCompactMeasureField('Plate', _plateCtrl, readOnly: _measurementsLocked),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 11. Front Pocket
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildOptionCheckbox('Front Pocket', _optFrontPocket, _measurementsLocked ? null : (v) => setState(() => _optFrontPocket = v)),
+                    ),
+                    if (_optFrontPocket)
+                      Expanded(
+                        flex: 1,
+                        child: _buildCompactMeasureField('', _frontPocketCtrl, readOnly: _measurementsLocked),
+                      )
+                    else
+                      const Spacer(),
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 12. Side Pocket
+                _buildOptionCheckbox('Side Pocket', _optSidePocket, _measurementsLocked ? null : (v) => setState(() => _optSidePocket = v)),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 13. Cuff
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Cuff', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 0,
+                      children: ['Round', 'Double kaj', 'Double', 'Square'].map((type) {
+                        return SizedBox(
+                          width: 140,
+                          child: RadioListTile<String>(
+                            title: Text(type, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                            value: type,
+                            groupValue: _cuffType,
+                            onChanged: _measurementsLocked ? null : (v) => setState(() => _cuffType = v!),
+                            activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+
+                // 14. Extra
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Extra', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: _extraCtrl,
+                      readOnly: _measurementsLocked,
+                      maxLines: 3,
+                      style: GoogleFonts.inter(fontSize: 14, color: _measurementsLocked ? kTextSec : kTextPri),
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: _measurementsLocked ? Colors.grey.shade100 : kBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: _measurementsLocked ? Colors.grey.shade300 : Colors.grey.shade200),
+                        ),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kAccent)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 32),
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 32),
+          // Nav buttons
+          Row(
+            children: [
+              Expanded(
+                flex: 1,
+                child: SizedBox(
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed: _prevStep,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kTextPri,
+                      side: BorderSide(color: Colors.grey.shade300, width: 2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                    ),
+                    child: Text('← Back', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: SizedBox(
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _showSaveConfirmation,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                      elevation: 0,
+                    ),
+                    child: Text('Save Changes', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+        ],
       ),
+    );
+  }
+
+  Widget _buildCompactMeasureField(String label, TextEditingController ctrl, {bool readOnly = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (label.isNotEmpty) ...[
+          Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+          const SizedBox(height: 4),
+        ],
+        SizedBox(
+          height: 40,
+          child: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.text,
+            readOnly: readOnly,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: readOnly ? kTextSec : kTextPri,
+            ),
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              filled: true,
+              fillColor: readOnly ? Colors.grey.shade100 : kBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: readOnly ? Colors.grey.shade300 : Colors.grey.shade200,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: kAccent),
+              ),
+              suffixIcon: readOnly
+                  ? const Icon(Icons.lock_outline, size: 14, color: kTextSec)
+                  : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOptionCheckbox(String title, bool value, ValueChanged<bool>? onChanged) {
+    return CheckboxListTile(
+      title: Text(title, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500)),
+      value: value,
+      onChanged: onChanged == null ? null : (bool? v) => onChanged(v ?? false),
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      activeColor: kAccent,
     );
   }
 }
@@ -953,156 +1065,6 @@ class _InputFieldState extends State<_InputField> {
           filled: true,
           fillColor: widget.readOnly ? Colors.grey.shade50 : kCard,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-      ),
-    );
-  }
-}
-
-class _MeasurementRow extends StatefulWidget {
-  final String label;
-  final TextEditingController controller;
-  final String unit;
-
-  const _MeasurementRow({
-    required this.label,
-    required this.controller,
-    required this.unit,
-  });
-
-  @override
-  State<_MeasurementRow> createState() => _MeasurementRowState();
-}
-
-class _MeasurementRowState extends State<_MeasurementRow> {
-  bool _focused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 3,
-          child: Text(
-            widget.label,
-            style: GoogleFonts.inter(fontSize: 14, color: kTextPri, fontWeight: FontWeight.w500),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          flex: 2,
-          child: Focus(
-            onFocusChange: (f) => setState(() => _focused = f),
-            child: TextFormField(
-              controller: widget.controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-              style: GoogleFonts.inter(fontSize: 14, color: kTextPri),
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                hintText: widget.unit,
-                hintStyle: GoogleFonts.inter(fontSize: 12, color: kTextSec),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(kR),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(kR),
-                  borderSide: const BorderSide(color: kAccent, width: 2),
-                ),
-                filled: true,
-                fillColor: _focused ? kAccent.withValues(alpha: 0.04) : kBg,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AnimatedCheckbox extends StatelessWidget {
-  final String label;
-  final bool checked;
-  final ValueChanged<bool> onChanged;
-
-  const _AnimatedCheckbox({
-    required this.label,
-    required this.checked,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onChanged(!checked),
-      child: Row(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: checked ? kAccent : Colors.transparent,
-              border: Border.all(
-                color: checked ? kAccent : kTextSec,
-                width: 2,
-              ),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: AnimatedOpacity(
-              opacity: checked ? 1 : 0,
-              duration: const Duration(milliseconds: 150),
-              child: const Icon(Icons.check, color: Colors.white, size: 14),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: checked ? kPrimary : kTextSec,
-                fontWeight: checked ? FontWeight.w600 : FontWeight.normal,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _UnitChip extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _UnitChip({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? kAccent : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: active ? Colors.white : kTextSec,
-          ),
         ),
       ),
     );

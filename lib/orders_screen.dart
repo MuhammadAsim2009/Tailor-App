@@ -18,6 +18,7 @@ const double kRadius = 16.0;
 // ─────────────────────────────────────────────────────────────────
 class OrderModel {
   final String id;
+  final String customerId;
   final String customerName;
   final String dressType;
   final String deliveryDate;
@@ -26,6 +27,7 @@ class OrderModel {
 
   OrderModel({
     required this.id,
+    required this.customerId,
     required this.customerName,
     required this.dressType,
     required this.deliveryDate,
@@ -57,6 +59,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   final List<OrderModel> _allOrders = [
     OrderModel(
       id: '#ORD-001',
+      customerId: '101',
       customerName: 'Ahmed Ali',
       dressType: '3-Piece Suit',
       deliveryDate: '12 Jun 2026',
@@ -65,6 +68,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-002',
+      customerId: '102',
       customerName: 'Sara Khan',
       dressType: 'Kurta Shalwar',
       deliveryDate: '14 Jun 2026',
@@ -73,6 +77,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-003',
+      customerId: '103',
       customerName: 'Usman Tariq',
       dressType: 'Formal Pant',
       deliveryDate: '10 Jun 2026',
@@ -81,6 +86,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-004',
+      customerId: '104',
       customerName: 'Aisha Bibi',
       dressType: 'Wedding Dress',
       deliveryDate: '08 Jun 2026',
@@ -89,6 +95,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-005',
+      customerId: '105',
       customerName: 'Bilal Malik',
       dressType: '2-Piece Suit',
       deliveryDate: '15 Jun 2026',
@@ -97,6 +104,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-006',
+      customerId: '106',
       customerName: 'Nadia Iqbal',
       dressType: 'Shirt',
       deliveryDate: '16 Jun 2026',
@@ -105,6 +113,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-007',
+      customerId: '107',
       customerName: 'Tariq Mehmood',
       dressType: 'Waistcoat',
       deliveryDate: '18 Jun 2026',
@@ -113,6 +122,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-008',
+      customerId: '108',
       customerName: 'Hina Baig',
       dressType: 'Lace Frock',
       deliveryDate: '20 Jun 2026',
@@ -121,6 +131,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-009',
+      customerId: '109',
       customerName: 'Kamran Shah',
       dressType: 'Shalwar Kameez',
       deliveryDate: '22 Jun 2026',
@@ -129,6 +140,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
     ),
     OrderModel(
       id: '#ORD-010',
+      customerId: '110',
       customerName: 'Saba Riaz',
       dressType: 'Bridal Suit',
       deliveryDate: '25 Jun 2026',
@@ -485,6 +497,11 @@ class _OrdersScreenState extends State<OrdersScreen> {
                             fontWeight: FontWeight.bold,
                             color: kTextPrimary,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'ID: ${order.customerId}',
+                          style: GoogleFonts.inter(fontSize: 12, color: kAccentColor, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Row(

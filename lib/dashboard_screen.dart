@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'orders_screen.dart';
 import 'customers_screen.dart';
 import 'speed_dial_fab.dart';
-import 'add_customer_screen.dart';
 import 'add_order_screen.dart';
 import 'add_expense_screen.dart';
 import 'order_detail_screen.dart';
@@ -21,12 +20,13 @@ const double kBorderRadius = 16.0;
 
 // Dummy Models
 class DummyOrder {
+  final String customerId;
   final String customerName;
   final String orderType;
   final String deliveryDate;
   final String status;
   
-  DummyOrder({required this.customerName, required this.orderType, required this.deliveryDate, required this.status});
+  DummyOrder({required this.customerId, required this.customerName, required this.orderType, required this.deliveryDate, required this.status});
 }
 
 class DashboardScreen extends StatefulWidget {
@@ -44,11 +44,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
   final List<String> _statusFilters = ['Pending', 'In Progress', 'Ready', 'Delivered'];
   
   final List<DummyOrder> _allOrders = [
-    DummyOrder(customerName: 'Ahmed Ali', orderType: '3-Piece Suit', deliveryDate: '12 Jun 2026', status: 'Pending'),
-    DummyOrder(customerName: 'Sara Khan', orderType: 'Kurta Shalwar', deliveryDate: '14 Jun 2026', status: 'In Progress'),
-    DummyOrder(customerName: 'Usman Tariq', orderType: 'Formal Pant', deliveryDate: '10 Jun 2026', status: 'Ready'),
-    DummyOrder(customerName: 'Aisha Bibi', orderType: 'Wedding Dress', deliveryDate: '08 Jun 2026', status: 'Delivered'),
-    DummyOrder(customerName: 'Bilal Malik', orderType: '2-Piece Suit', deliveryDate: '15 Jun 2026', status: 'Pending'),
+    DummyOrder(customerId: '101', customerName: 'Ahmed Ali', orderType: '3-Piece Suit', deliveryDate: '12 Jun 2026', status: 'Pending'),
+    DummyOrder(customerId: '102', customerName: 'Sara Khan', orderType: 'Kurta Shalwar', deliveryDate: '14 Jun 2026', status: 'In Progress'),
+    DummyOrder(customerId: '103', customerName: 'Usman Tariq', orderType: 'Formal Pant', deliveryDate: '10 Jun 2026', status: 'Ready'),
+    DummyOrder(customerId: '104', customerName: 'Aisha Bibi', orderType: 'Wedding Dress', deliveryDate: '08 Jun 2026', status: 'Delivered'),
+    DummyOrder(customerId: '105', customerName: 'Bilal Malik', orderType: '2-Piece Suit', deliveryDate: '15 Jun 2026', status: 'Pending'),
   ];
 
   @override
@@ -106,8 +106,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               Navigator.push(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (_, animation, __) => const AddExpenseScreen(),
-                  transitionsBuilder: (_, animation, __, child) {
+                  pageBuilder: (_, animation, secondaryAnimation) => const AddExpenseScreen(),
+                  transitionsBuilder: (_, animation, secondaryAnimation, child) {
                     return SlideTransition(
                       position: Tween<Offset>(
                         begin: const Offset(0, 1),
@@ -120,18 +120,6 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                     );
                   },
                   transitionDuration: const Duration(milliseconds: 350),
-                ),
-              );
-            },
-          ),
-          SpeedDialOption(
-            icon: Icons.person_add_outlined,
-            label: 'Add Customer',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AddCustomerScreen(),
                 ),
               );
             },
@@ -299,7 +287,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               fontWeight: FontWeight.bold,
               color: textColor,
             ),
-            prefix: isCurrency ? '\$' : '',
+            prefix: isCurrency ? 'PKR ' : '',
           ),
           const SizedBox(height: 4),
           Text(
@@ -345,8 +333,9 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
               onTap: () => setState(() => _bottomNavIndex = 3),
             ),
             _buildActionItem(
-              icon: Icons.straighten_outlined,
-              label: 'Measurements',
+              icon: Icons.list_alt_outlined,
+              label: 'Orders',
+              onTap: () => setState(() => _bottomNavIndex = 1),
             ),
           ],
         ),
@@ -479,6 +468,11 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      'ID: ${order.customerId}',
+                      style: GoogleFonts.inter(color: kAccentColor, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 4),
                     Text(
                       order.orderType,

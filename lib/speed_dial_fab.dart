@@ -140,6 +140,17 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
     if (_isOpen) _toggle();
   }
 
+  /// Instantly tears down the overlay then runs [action].
+  /// Use this when an option button is tapped so the overlay is gone
+  /// before the new route is pushed — otherwise the overlay floats on
+  /// top of the pushed screen and blocks every touch event.
+  void _closeAndAct(VoidCallback action) {
+    _controller.reset(); // snap rotation back to + (not frozen at ×)
+    _removeOverlay();
+    if (mounted) setState(() => _isOpen = false);
+    action();
+  }
+
   void _insertOverlay() {
     final renderBox = context.findRenderObject()! as RenderBox;
     final fabSize   = renderBox.size;
@@ -193,10 +204,7 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
                         position: _slideAnims[i],
                         child: _DialOptionButton(
                           option: opt,
-                          onTap: () {
-                            _close();
-                            opt.onTap();
-                          },
+                          onTap: () => _closeAndAct(opt.onTap),
                         ),
                       ),
                     ),
