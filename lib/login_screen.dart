@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'tailor_icon.dart';
 import 'dashboard_screen.dart';
+import 'controllers/profile_controller.dart';
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
 const Color kAccentColor = Color(0xFF10B981); // Emerald Green
@@ -120,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     
                     // 3. Subtitle
                     Text(
-                      'Irfan Tailors Management',
+                      ProfileController().profile?.shopName == null || ProfileController().profile!.shopName.isEmpty ? 'Tailor App Management' : '${ProfileController().profile!.shopName} Management',
                       style: secondaryTextStyle.copyWith(
                         fontSize: 16,
                       ),

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'profile_settings_screen.dart';
-import 'package:intl/intl.dart';
 import 'orders_screen.dart';
 import 'customers_screen.dart';
 import 'speed_dial_fab.dart';
@@ -11,6 +9,10 @@ import 'add_order_screen.dart';
 import 'add_expense_screen.dart';
 import 'order_detail_screen.dart';
 import 'expenses_screen.dart';
+import '../controllers/order_controller.dart';
+import '../controllers/expense_controller.dart';
+import '../controllers/profile_controller.dart';
+import '../models/order_model.dart';
 
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
@@ -21,22 +23,6 @@ const Color kTextPrimary = Color(0xFF0F172A);
 const Color kTextSecondary = Color(0xFF64748B);
 const double kBorderRadius = 16.0;
 
-// Dummy Models
-class DummyOrder {
-  final String customerId;
-  final String customerName;
-  final String orderType;
-  final String deliveryDate;
-  final String status;
-
-  DummyOrder({
-    required this.customerId,
-    required this.customerName,
-    required this.orderType,
-    required this.deliveryDate,
-    required this.status,
-  });
-}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -49,7 +35,35 @@ class _DashboardScreenState extends State<DashboardScreen>
     with TickerProviderStateMixin {
   int _bottomNavIndex = 0;
   String _activeStatusChip = 'Pending';
-  bool _isLoading = true;
+  final OrderController _orderController = OrderController();
+  final ExpenseController _expenseController = ExpenseController();
+  final ProfileController _profileController = ProfileController();
+
+  void _onStateChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _orderController.addListener(_onStateChanged);
+    _expenseController.addListener(_onStateChanged);
+    _profileController.addListener(_onStateChanged);
+  }
+
+  @override
+  void dispose() {
+    _orderController.removeListener(_onStateChanged);
+    _expenseController.removeListener(_onStateChanged);
+    _profileController.removeListener(_onStateChanged);
+    super.dispose();
+  }
+
+  List<OrderModel> get _filteredOrders {
+    return _orderController.orders
+        .where((o) => o.status == _activeStatusChip)
+        .toList();
+  }
 
   final List<String> _statusFilters = [
     'Pending',
@@ -58,68 +72,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     'Delivered',
   ];
 
-  final List<DummyOrder> _allOrders = [
-    DummyOrder(
-      customerId: '101',
-      customerName: 'Ahmed Ali',
-      orderType: '3-Piece Suit',
-      deliveryDate: '12 Jun 2026',
-      status: 'Pending',
-    ),
-    DummyOrder(
-      customerId: '102',
-      customerName: 'Sara Khan',
-      orderType: 'Kurta Shalwar',
-      deliveryDate: '14 Jun 2026',
-      status: 'In Progress',
-    ),
-    DummyOrder(
-      customerId: '103',
-      customerName: 'Usman Tariq',
-      orderType: 'Formal Pant',
-      deliveryDate: '10 Jun 2026',
-      status: 'Ready',
-    ),
-    DummyOrder(
-      customerId: '104',
-      customerName: 'Aisha Bibi',
-      orderType: 'Wedding Dress',
-      deliveryDate: '08 Jun 2026',
-      status: 'Delivered',
-    ),
-    DummyOrder(
-      customerId: '105',
-      customerName: 'Bilal Malik',
-      orderType: '2-Piece Suit',
-      deliveryDate: '15 Jun 2026',
-      status: 'Pending',
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    // Simulate loading data
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    });
-  }
-
-  List<DummyOrder> get _filteredOrders {
-    return _allOrders
-        .where((order) => order.status == _activeStatusChip)
-        .toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kBackgroundColor,
-      body: _isLoading
+      body: _orderController.isLoading
           ? SafeArea(child: _buildSkeletonLoading())
           : _bottomNavIndex == 1
           ? const OrdersScreen()
@@ -132,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         currentIndex: _bottomNavIndex,
         onTap: (index) => setState(() => _bottomNavIndex = index),
       ),
-      floatingActionButton: _isLoading
+      floatingActionButton: _orderController.isLoading
           ? null
           : SpeedDialFAB(
               options: [
@@ -143,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const AddOrderScreen()),
-                    );
+                    ).then((_) => _orderController.loadData());
                   },
                 ),
                 SpeedDialOption(
@@ -173,7 +130,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             },
                         transitionDuration: const Duration(milliseconds: 350),
                       ),
-                    );
+                    ).then((_) => _orderController.loadData());
                   },
                 ),
               ],
@@ -206,6 +163,17 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   // --- Subcomponents ---
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good Morning,';
+    } else if (hour < 17) {
+      return 'Good Afternoon,';
+    } else {
+      return 'Good Evening,';
+    }
+  }
+
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -214,12 +182,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Good Morning,',
+              _getGreeting(),
               style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
             ),
             const SizedBox(height: 4),
             Text(
-              'Irfan Tailors',
+              _profileController.profile?.shopName ?? 'Tailor App',
               style: GoogleFonts.inter(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -274,6 +242,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildKPIGrid() {
+    final orders = _orderController.orders;
+    final total = orders.length;
+    final pendingAmount = orders.fold<double>(0, (sum, o) => sum + (o.status == 'Delivered' ? 0 : (o.totalAmount - o.advancePaid)));
+    final completed = orders.where((o) => o.status == 'Delivered').length;
+    final revenue = orders.fold<double>(0, (sum, o) => sum + (o.status == 'Delivered' ? o.totalAmount : o.advancePaid));
+
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: 16,
@@ -284,22 +258,23 @@ class _DashboardScreenState extends State<DashboardScreen>
       children: [
         _buildKPICard(
           title: 'Total Orders',
-          value: 124,
+          value: total,
           icon: Icons.list_alt_outlined,
           bgColor: kPrimaryColor,
           textColor: Colors.white,
         ),
         _buildKPICard(
-          title: 'Pending',
-          value: 12,
+          title: 'Pending Dues',
+          value: pendingAmount.toInt(),
           icon: Icons.pending_actions_outlined,
           bgColor: kCardColor,
           textColor: kTextPrimary,
           iconColor: Colors.orange,
+          isCurrency: true,
         ),
         _buildKPICard(
           title: 'Completed',
-          value: 89,
+          value: completed,
           icon: Icons.check_circle_outline,
           bgColor: kCardColor,
           textColor: kTextPrimary,
@@ -307,7 +282,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         _buildKPICard(
           title: 'Revenue',
-          value: 4500, // Prefix handled inside
+          value: revenue.toInt(),
           icon: Icons.account_balance_wallet_outlined,
           bgColor: kCardColor,
           textColor: kTextPrimary,
@@ -393,7 +368,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AddOrderScreen()),
-              ),
+              ).then((_) => _orderController.loadData()),
             ),
             _buildActionItem(
               icon: Icons.people_outline,
@@ -505,6 +480,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildRecentOrders() {
+    final orders = _filteredOrders;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -517,7 +493,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
         ),
         const SizedBox(height: 16),
-        if (_filteredOrders.isEmpty)
+        if (orders.isEmpty)
           Center(
             child: Padding(
               padding: const EdgeInsets.all(32.0),
@@ -528,7 +504,9 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           )
         else
-          ..._filteredOrders.map((order) {
+          ...orders.map((order) {
+            final customerName = _orderController.getCustomerName(order.customerId);
+            final deliveryFormatted = DateFormat('d MMM yyyy').format(order.deliveryDate);
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
@@ -543,16 +521,26 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ],
               ),
               child: ListTile(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const OrderDetailScreen()),
-                ),
+                onTap: () {
+                  final customer = _orderController.getCustomerById(order.customerId);
+                  if (customer != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OrderDetailScreen(
+                          order: order,
+                          customer: customer,
+                        ),
+                      ),
+                    ).then((_) => _orderController.loadData());
+                  }
+                },
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 8,
                 ),
                 title: Text(
-                  order.customerName,
+                  customerName,
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
                     color: kTextPrimary,
@@ -563,16 +551,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   children: [
                     const SizedBox(height: 4),
                     Text(
-                      'ID: ${order.customerId}',
-                      style: GoogleFonts.inter(
-                        color: kAccentColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      order.orderType,
+                      order.isAdult ? 'Adult Order' : 'Child Order',
                       style: GoogleFonts.inter(
                         color: kTextSecondary,
                         fontSize: 13,
@@ -588,7 +567,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          order.deliveryDate,
+                          deliveryFormatted,
                           style: GoogleFonts.inter(
                             color: kTextSecondary,
                             fontSize: 12,

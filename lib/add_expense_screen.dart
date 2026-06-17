@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../controllers/expense_controller.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
@@ -58,6 +59,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   final TextEditingController _notesCtrl  = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
+  final ExpenseController _controller = ExpenseController();
+
   @override
   void initState() {
     super.initState();
@@ -104,11 +107,22 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   // ── Save Expense ──
-  void _saveExpense() {
-    if (!_canSave) return;
-    // TODO: persist to backend
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
+  void _saveExpense() async {
+    if (!_canSave || _selectedCategoryIndex == null) return;
+    
+    final categoryName = _categories[_selectedCategoryIndex!].name;
+    
+    await _controller.addExpense(
+      title: _titleCtrl.text.trim(),
+      category: categoryName,
+      amount: _parsedAmount,
+      date: _selectedDate,
+      notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+    );
+
+    if (mounted) {
+      Navigator.pop(context, true);
+      ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           'Expense saved: PKR ${_parsedAmount.toStringAsFixed(0)}',
@@ -119,6 +133,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────

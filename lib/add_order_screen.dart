@@ -1,6 +1,12 @@
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+
+import '../models/customer_model.dart';
+import '../models/order_model.dart';
+import '../models/measurement_model.dart';
+import '../controllers/order_controller.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
@@ -12,71 +18,6 @@ const Color kCard = Color(0xFFFFFFFF);
 const Color kTextPri = Color(0xFF0F172A);
 const Color kTextSec = Color(0xFF64748B);
 const double kR = 16.0;
-
-// ─────────────────────────────────────────────────────────────────
-//  Dummy Data Model
-// ─────────────────────────────────────────────────────────────────
-class DummyCustomer {
-  final String id;
-  final String name;
-  final String phone;
-  final String? address;
-
-  // Saved measurements
-  final String? lengthMeasure;
-  final String? armMeasure;
-  final bool optMundo;
-  final String? shoulderMeasure;
-  final String? collarMeasure;
-  final bool colRegular;
-  final bool colFrench;
-  final bool colSherwani;
-  final String sherwaniType;
-  final String? chestMeasure;
-  final String? waistMeasure;
-  final String? hipMeasure;
-  final String? shalwarMeasure;
-  final bool shalKanto;
-  final bool shalZipPocket;
-  final bool shalWidth;
-  final String? bottomMeasure;
-  final String? plateMeasure;
-  final bool optFrontPocket;
-  final String? frontPocketMeasure;
-  final bool optSidePocket;
-  final String cuffType;
-  final String? extraNotes;
-
-  DummyCustomer({
-    required this.id,
-    required this.name,
-    required this.phone,
-    this.address,
-    this.lengthMeasure,
-    this.armMeasure,
-    this.optMundo = false,
-    this.shoulderMeasure,
-    this.collarMeasure,
-    this.colRegular = false,
-    this.colFrench = false,
-    this.colSherwani = false,
-    this.sherwaniType = 'Half',
-    this.chestMeasure,
-    this.waistMeasure,
-    this.hipMeasure,
-    this.shalwarMeasure,
-    this.shalKanto = false,
-    this.shalZipPocket = false,
-    this.shalWidth = false,
-    this.bottomMeasure,
-    this.plateMeasure,
-    this.optFrontPocket = false,
-    this.frontPocketMeasure,
-    this.optSidePocket = false,
-    this.cuffType = 'Round',
-    this.extraNotes,
-  });
-}
 
 // ─────────────────────────────────────────────────────────────────
 //  AddOrderScreen — 4-Step Wizard
@@ -96,25 +37,16 @@ class _AddOrderScreenState extends State<AddOrderScreen>
 
   // ── Step 1: Customer Details ──
   final _formKey1 = GlobalKey<FormState>();
-  final _idCtrl = TextEditingController(text: '101');
+  final _idCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _addrCtrl = TextEditingController();
 
-  final List<DummyCustomer> _dummyCustomers = [
-    DummyCustomer(
-      id: '101', name: 'Ahmed Ali', phone: '+92 300 1234567', address: 'Lahore',
-      lengthMeasure: '40', chestMeasure: '42', waistMeasure: '34', shoulderMeasure: '18', hipMeasure: '40', bottomMeasure: '14',
-      armMeasure: '24', optMundo: true,
-      collarMeasure: '16', colSherwani: true, sherwaniType: 'Half',
-      shalwarMeasure: '36', shalKanto: true,
-      plateMeasure: '12', optFrontPocket: true, frontPocketMeasure: '5', optSidePocket: false,
-      cuffType: 'Round', extraNotes: 'Need it urgently by evening.',
-    ),
-  ];
+  final OrderController _orderController = OrderController();
 
-  DummyCustomer? _selectedCustomer;
-  bool _measurementsLocked = false; // only locked when auto-filled from an existing customer
+  CustomerModel? _selectedCustomer;
+  bool _measurementsLocked =
+      false; // only locked when auto-filled from an existing customer
 
   // ── Step 2: Customer Type ──
   bool _isAdult = true;
@@ -158,10 +90,24 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     super.initState();
     _totalCtrl.addListener(_updateBalance);
     _advanceCtrl.addListener(_updateBalance);
+    _orderController.addListener(_onDataLoaded);
+    // If data is already loaded, populate immediately
+    if (!_orderController.isLoading) {
+      _onDataLoaded();
+    }
+  }
+
+  void _onDataLoaded() {
+    if (!_orderController.isLoading && _selectedCustomer == null) {
+      if (_idCtrl.text.isEmpty) {
+        _idCtrl.text = _orderController.nextCustomerId;
+      }
+    }
   }
 
   @override
   void dispose() {
+    _orderController.removeListener(_onDataLoaded);
     _pageController.dispose();
     _idCtrl.dispose();
     _nameCtrl.dispose();
@@ -202,8 +148,11 @@ class _AddOrderScreenState extends State<AddOrderScreen>
 
     if (_currentStep < 3) {
       setState(() => _currentStep++);
-      _pageController.animateToPage(_currentStep,
-          duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
     } else {
       _confirmOrder();
     }
@@ -212,22 +161,94 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   void _prevStep() {
     if (_currentStep > 0) {
       setState(() => _currentStep--);
-      _pageController.animateToPage(_currentStep,
-          duration: const Duration(milliseconds: 350), curve: Curves.easeInOut);
+      _pageController.animateToPage(
+        _currentStep,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
-  void _confirmOrder() {
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Order created for ${_nameCtrl.text}!',
-            style: GoogleFonts.inter(color: Colors.white)),
-        backgroundColor: kAccent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+  void _confirmOrder() async {
+    final customer =
+        _selectedCustomer ??
+        CustomerModel(
+          id: '', // Will be generated by controller
+          name: _nameCtrl.text,
+          phone: _phoneCtrl.text,
+          address: _addrCtrl.text,
+        );
+
+    final measurements = MeasurementModel(
+      lengthMeasure: _lengthCtrl.text,
+      armMeasure: _armCtrl.text,
+      optMundo: _optMundo,
+      shoulderMeasure: _shoulderCtrl.text,
+      collarMeasure: _collarCtrl.text,
+      colRegular: _colRegular,
+      colFrench: _colFrench,
+      colSherwani: _colSherwani,
+      sherwaniType: _sherwaniType,
+      chestMeasure: _chestCtrl.text,
+      waistMeasure: _waistCtrl.text,
+      hipMeasure: _hipCtrl.text,
+      shalwarMeasure: _shalwarCtrl.text,
+      shalKanto: _shalKanto,
+      shalZipPocket: _shalZipPocket,
+      shalWidth: _shalWidth,
+      bottomMeasure: _bottomCtrl.text,
+      plateMeasure: _plateCtrl.text,
+      optFrontPocket: _optFrontPocket,
+      frontPocketMeasure: _frontPocketCtrl.text,
+      optSidePocket: _optSidePocket,
+      cuffType: _cuffType,
+      extraNotes: _extraCtrl.text,
     );
+
+    final order = OrderModel(
+      id: '', // Generated by controller
+      customerId: '', // Replaced by controller
+      isAdult: _isAdult,
+      quantity: int.tryParse(_quantityCtrl.text) ?? 1,
+      orderDate: _orderDate ?? DateTime.now(),
+      deliveryDate:
+          _deliveryDate ?? DateTime.now().add(const Duration(days: 7)),
+      totalAmount: double.tryParse(_totalCtrl.text) ?? 0.0,
+      advancePaid: double.tryParse(_advanceCtrl.text) ?? 0.0,
+      measurements: measurements,
+      status: 'Pending',
+    );
+
+    try {
+      await _orderController.addOrder(order: order, customer: customer);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Order saved successfully!',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: kAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to save order.',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _selectDate(bool isDelivery) async {
@@ -239,7 +260,10 @@ class _AddOrderScreenState extends State<AddOrderScreen>
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
-            primary: kAccent, onPrimary: Colors.white, onSurface: kPrimary),
+            primary: kAccent,
+            onPrimary: Colors.white,
+            onSurface: kPrimary,
+          ),
         ),
         child: child!,
       ),
@@ -255,30 +279,32 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     }
   }
 
-  void _fillMeasurements(DummyCustomer c) {
-    _lengthCtrl.text = c.lengthMeasure ?? '';
-    _armCtrl.text = c.armMeasure ?? '';
-    _optMundo = c.optMundo;
-    _shoulderCtrl.text = c.shoulderMeasure ?? '';
-    _collarCtrl.text = c.collarMeasure ?? '';
-    _colRegular = c.colRegular;
-    _colFrench = c.colFrench;
-    _colSherwani = c.colSherwani;
-    _sherwaniType = c.sherwaniType;
-    _chestCtrl.text = c.chestMeasure ?? '';
-    _waistCtrl.text = c.waistMeasure ?? '';
-    _hipCtrl.text = c.hipMeasure ?? '';
-    _shalwarCtrl.text = c.shalwarMeasure ?? '';
-    _shalKanto = c.shalKanto;
-    _shalZipPocket = c.shalZipPocket;
-    _shalWidth = c.shalWidth;
-    _bottomCtrl.text = c.bottomMeasure ?? '';
-    _plateCtrl.text = c.plateMeasure ?? '';
-    _optFrontPocket = c.optFrontPocket;
-    _frontPocketCtrl.text = c.frontPocketMeasure ?? '';
-    _optSidePocket = c.optSidePocket;
-    _cuffType = c.cuffType;
-    _extraCtrl.text = c.extraNotes ?? '';
+  void _fillMeasurements(CustomerModel c) {
+    if (c.measurements == null) return;
+    final m = c.measurements!;
+    _lengthCtrl.text = m.lengthMeasure ?? '';
+    _armCtrl.text = m.armMeasure ?? '';
+    _optMundo = m.optMundo;
+    _shoulderCtrl.text = m.shoulderMeasure ?? '';
+    _collarCtrl.text = m.collarMeasure ?? '';
+    _colRegular = m.colRegular;
+    _colFrench = m.colFrench;
+    _colSherwani = m.colSherwani;
+    _sherwaniType = m.sherwaniType;
+    _chestCtrl.text = m.chestMeasure ?? '';
+    _waistCtrl.text = m.waistMeasure ?? '';
+    _hipCtrl.text = m.hipMeasure ?? '';
+    _shalwarCtrl.text = m.shalwarMeasure ?? '';
+    _shalKanto = m.shalKanto;
+    _shalZipPocket = m.shalZipPocket;
+    _shalWidth = m.shalWidth;
+    _bottomCtrl.text = m.bottomMeasure ?? '';
+    _plateCtrl.text = m.plateMeasure ?? '';
+    _optFrontPocket = m.optFrontPocket;
+    _frontPocketCtrl.text = m.frontPocketMeasure ?? '';
+    _optSidePocket = m.optSidePocket;
+    _cuffType = m.cuffType;
+    _extraCtrl.text = m.extraNotes ?? '';
   }
 
   void _showExistingCustomerModal() {
@@ -294,51 +320,97 @@ class _AddOrderScreenState extends State<AddOrderScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Select Existing Customer',
-                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimary)),
+              Text(
+                'Select Existing Customer',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: kPrimary,
+                ),
+              ),
               const SizedBox(height: 16),
               Expanded(
-                child: ListView.separated(
-                  itemCount: _dummyCustomers.length,
-                  separatorBuilder: (context, _) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final c = _dummyCustomers[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: kAccent.withOpacity(0.1),
+                child: AnimatedBuilder(
+                  animation: _orderController,
+                  builder: (context, _) {
+                    if (_orderController.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (_orderController.customers.isEmpty) {
+                      return Center(
                         child: Text(
-                          c.name.isNotEmpty ? c.name[0] : '?',
-                          style: GoogleFonts.inter(color: kAccent, fontWeight: FontWeight.bold),
+                          "No customers found.",
+                          style: GoogleFonts.inter(color: kTextSec),
                         ),
-                      ),
-                      title: Text(c.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                      subtitle: Text(c.phone, style: GoogleFonts.inter(color: kTextSec, fontSize: 12)),
-                      trailing: c.lengthMeasure != null
-                          ? Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: kAccent.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(8),
+                      );
+                    }
+                    return ListView.separated(
+                      itemCount: _orderController.customers.length,
+                      separatorBuilder: (context, _) =>
+                          const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final c = _orderController.customers[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: kAccent.withValues(alpha: 0.1),
+                            child: Text(
+                              c.name.isNotEmpty ? c.name[0] : '?',
+                              style: GoogleFonts.inter(
+                                color: kAccent,
+                                fontWeight: FontWeight.bold,
                               ),
-                              child: Text('Has Data',
-                                  style: GoogleFonts.inter(fontSize: 11, color: kAccent, fontWeight: FontWeight.bold)),
-                            )
-                          : null,
-                      onTap: () {
-                        setState(() {
-                          _selectedCustomer = c;
-                          _idCtrl.text = c.id;
-                          _nameCtrl.text = c.name;
-                          _phoneCtrl.text = c.phone;
-                          _addrCtrl.text = c.address ?? '';
-                          if (c.lengthMeasure != null) {
-                            _fillMeasurements(c);
-                            _measurementsLocked = true;
-                          } else {
-                            _measurementsLocked = false;
-                          }
-                        });
-                        Navigator.pop(context);
+                            ),
+                          ),
+                          title: Text(
+                            c.name,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: Text(
+                            c.phone,
+                            style: GoogleFonts.inter(
+                              color: kTextSec,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: c.measurements != null
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: kAccent.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    'Has Data',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: kAccent,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                          onTap: () {
+                            setState(() {
+                              _selectedCustomer = c;
+                              _idCtrl.text = c.id;
+                              _nameCtrl.text = c.name;
+                              _phoneCtrl.text = c.phone;
+                              _addrCtrl.text = c.address ?? '';
+                              if (c.measurements != null) {
+                                _fillMeasurements(c);
+                                _measurementsLocked = true;
+                              } else {
+                                _measurementsLocked = false;
+                              }
+                            });
+                            Navigator.pop(context);
+                          },
+                        );
                       },
                     );
                   },
@@ -387,11 +459,21 @@ class _AddOrderScreenState extends State<AddOrderScreen>
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_outlined, color: kPrimary, size: 20),
+        icon: const Icon(
+          Icons.arrow_back_ios_new_outlined,
+          color: kPrimary,
+          size: 20,
+        ),
         onPressed: () => Navigator.maybePop(context),
       ),
-      title: Text('Add New Order',
-          style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.bold, color: kPrimary)),
+      title: Text(
+        'Add New Order',
+        style: GoogleFonts.inter(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: kPrimary,
+        ),
+      ),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: Colors.grey.shade100),
@@ -419,15 +501,23 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                       height: 28,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isPast || isCurrent ? kAccent : Colors.grey.shade200,
+                        color: isPast || isCurrent
+                            ? kAccent
+                            : Colors.grey.shade200,
                       ),
                       child: Center(
                         child: isPast
-                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                            ? const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 16,
+                              )
                             : Text(
                                 '${i + 1}',
                                 style: GoogleFonts.inter(
-                                  color: isCurrent ? Colors.white : Colors.grey.shade600,
+                                  color: isCurrent
+                                      ? Colors.white
+                                      : Colors.grey.shade600,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                 ),
@@ -439,8 +529,12 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                       steps[i],
                       style: GoogleFonts.inter(
                         fontSize: 10,
-                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                        color: isPast || isCurrent ? kPrimary : Colors.grey.shade500,
+                        fontWeight: isCurrent
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: isPast || isCurrent
+                            ? kPrimary
+                            : Colors.grey.shade500,
                       ),
                     ),
                   ],
@@ -449,7 +543,11 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                   Expanded(
                     child: Container(
                       height: 2,
-                      margin: const EdgeInsets.only(bottom: 16, left: 4, right: 4),
+                      margin: const EdgeInsets.only(
+                        bottom: 16,
+                        left: 4,
+                        right: 4,
+                      ),
                       color: isPast ? kAccent : Colors.grey.shade200,
                     ),
                   ),
@@ -489,7 +587,8 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     label: 'Full Name',
                     hint: 'e.g. Ahmed Ali',
                     icon: Icons.person_outline,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
                   _InputField(
@@ -498,7 +597,8 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     hint: '+92 300 1234567',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
                   _InputField(
@@ -514,14 +614,24 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     height: 48,
                     child: OutlinedButton.icon(
                       onPressed: _showExistingCustomerModal,
-                      icon: const Icon(Icons.people_alt_outlined, color: kAccent, size: 18),
+                      icon: const Icon(
+                        Icons.people_alt_outlined,
+                        color: kAccent,
+                        size: 18,
+                      ),
                       label: Text(
                         'Select Existing Customer',
-                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: kAccent),
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: kAccent,
+                        ),
                       ),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: kAccent),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(kR),
+                        ),
                       ),
                     ),
                   ),
@@ -551,7 +661,13 @@ class _AddOrderScreenState extends State<AddOrderScreen>
               children: [
                 Expanded(
                   child: RadioListTile<bool>(
-                    title: Text('Adult', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500)),
+                    title: Text(
+                      'Adult',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     value: true,
                     groupValue: _isAdult,
                     activeColor: kAccent,
@@ -561,7 +677,13 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                 ),
                 Expanded(
                   child: RadioListTile<bool>(
-                    title: Text('Child', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500)),
+                    title: Text(
+                      'Child',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     value: false,
                     groupValue: _isAdult,
                     activeColor: kAccent,
@@ -600,12 +722,21 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     hint: '1',
                     icon: Icons.format_list_numbered,
                     keyboardType: TextInputType.number,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
-                  _buildDatePickerRow('Order Date', _orderDate, () => _selectDate(false)),
+                  _buildDatePickerRow(
+                    'Order Date',
+                    _orderDate,
+                    () => _selectDate(false),
+                  ),
                   const SizedBox(height: 16),
-                  _buildDatePickerRow('Delivery Date', _deliveryDate, () => _selectDate(true)),
+                  _buildDatePickerRow(
+                    'Delivery Date',
+                    _deliveryDate,
+                    () => _selectDate(true),
+                  ),
                 ],
               ),
             ),
@@ -620,7 +751,8 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     hint: '0',
                     icon: Icons.money,
                     keyboardType: TextInputType.number,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 16),
                   _InputField(
@@ -641,11 +773,21 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Remaining Balance',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kTextPri)),
-                        Text('PKR ${_remainingBalance.toStringAsFixed(0)}',
-                            style: GoogleFonts.inter(
-                                fontWeight: FontWeight.bold, color: kAccent, fontSize: 16)),
+                        Text(
+                          'Remaining Balance',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                            color: kTextPri,
+                          ),
+                        ),
+                        Text(
+                          'PKR ${_remainingBalance.toStringAsFixed(0)}',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold,
+                            color: kAccent,
+                            fontSize: 16,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -672,17 +814,30 @@ class _AddOrderScreenState extends State<AddOrderScreen>
         ),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today_outlined, color: kTextSec, size: 20),
+            const Icon(
+              Icons.calendar_today_outlined,
+              color: kTextSec,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: GoogleFonts.inter(fontSize: 12, color: kTextSec)),
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(fontSize: 12, color: kTextSec),
+                  ),
                   const SizedBox(height: 4),
                   Text(
-                    date != null ? DateFormat('dd MMM, yyyy').format(date) : 'Select date',
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: kTextPri),
+                    date != null
+                        ? DateFormat('dd MMM, yyyy').format(date)
+                        : 'Select date',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: kTextPri,
+                    ),
                   ),
                 ],
               ),
@@ -709,15 +864,22 @@ class _AddOrderScreenState extends State<AddOrderScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: _measurementsLocked ? kAccent.withValues(alpha: 0.1) : kPrimary.withValues(alpha: 0.1),
+                color: _measurementsLocked
+                    ? kAccent.withValues(alpha: 0.1)
+                    : kPrimary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: _measurementsLocked ? kAccent.withValues(alpha: 0.3) : kPrimary.withValues(alpha: 0.3)),
+                  color: _measurementsLocked
+                      ? kAccent.withValues(alpha: 0.3)
+                      : kPrimary.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
                   Icon(
-                    _measurementsLocked ? Icons.lock_outline : Icons.edit_outlined,
+                    _measurementsLocked
+                        ? Icons.lock_outline
+                        : Icons.edit_outlined,
                     color: _measurementsLocked ? kAccent : kPrimary,
                     size: 20,
                   ),
@@ -727,11 +889,14 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _measurementsLocked ? 'Auto-filled from saved data' : 'Edit Mode',
+                          _measurementsLocked
+                              ? 'Auto-filled from saved data'
+                              : 'Edit Mode',
                           style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _measurementsLocked ? kAccent : kPrimary),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _measurementsLocked ? kAccent : kPrimary,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -739,8 +904,11 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                               ? 'Measurements are locked.'
                               : 'Measurements unlocked.',
                           style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: _measurementsLocked ? Colors.green.shade700 : kTextSec),
+                            fontSize: 11,
+                            color: _measurementsLocked
+                                ? Colors.green.shade700
+                                : kTextSec,
+                          ),
                         ),
                       ],
                     ),
@@ -755,7 +923,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     activeTrackColor: kPrimary.withValues(alpha: 0.5),
                     inactiveThumbColor: kAccent,
                     inactiveTrackColor: kAccent.withValues(alpha: 0.3),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -767,37 +935,91 @@ class _AddOrderScreenState extends State<AddOrderScreen>
             child: Column(
               children: [
                 // 1. Length
-                _buildCompactMeasureField('Length', _lengthCtrl, readOnly: _measurementsLocked),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
-                
+                _buildCompactMeasureField(
+                  'Length',
+                  _lengthCtrl,
+                  readOnly: _measurementsLocked,
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
+
                 // 2. Arm + Mundo
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(child: _buildCompactMeasureField('Arm', _armCtrl, readOnly: _measurementsLocked)),
+                    Expanded(
+                      child: _buildCompactMeasureField(
+                        'Arm',
+                        _armCtrl,
+                        readOnly: _measurementsLocked,
+                      ),
+                    ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildOptionCheckbox('Mundo', _optMundo, _measurementsLocked ? null : (v) => setState(() => _optMundo = v)),
+                      child: _buildOptionCheckbox(
+                        'Mundo',
+                        _optMundo,
+                        _measurementsLocked
+                            ? null
+                            : (v) => setState(() => _optMundo = v),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 3. Shoulder
-                _buildCompactMeasureField('Shoulder', _shoulderCtrl, readOnly: _measurementsLocked),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                _buildCompactMeasureField(
+                  'Shoulder',
+                  _shoulderCtrl,
+                  readOnly: _measurementsLocked,
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 4. Collar
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildCompactMeasureField('Collar', _collarCtrl, readOnly: _measurementsLocked),
+                    _buildCompactMeasureField(
+                      'Collar',
+                      _collarCtrl,
+                      readOnly: _measurementsLocked,
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(child: _buildOptionCheckbox('Regular', _colRegular, _measurementsLocked ? null : (v) => setState(() => _colRegular = v))),
-                        Expanded(child: _buildOptionCheckbox('French', _colFrench, _measurementsLocked ? null : (v) => setState(() => _colFrench = v))),
-                        Expanded(child: _buildOptionCheckbox('Sherwani', _colSherwani, _measurementsLocked ? null : (v) => setState(() => _colSherwani = v))),
+                        Expanded(
+                          child: _buildOptionCheckbox(
+                            'Regular',
+                            _colRegular,
+                            _measurementsLocked
+                                ? null
+                                : (v) => setState(() => _colRegular = v),
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildOptionCheckbox(
+                            'French',
+                            _colFrench,
+                            _measurementsLocked
+                                ? null
+                                : (v) => setState(() => _colFrench = v),
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildOptionCheckbox(
+                            'Sherwani',
+                            _colSherwani,
+                            _measurementsLocked
+                                ? null
+                                : (v) => setState(() => _colSherwani = v),
+                          ),
+                        ),
                       ],
                     ),
                     if (_colSherwani) ...[
@@ -806,65 +1028,147 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                         children: [
                           Expanded(
                             child: RadioListTile<String>(
-                              title: Text('Half', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                              title: Text(
+                                'Half',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               value: 'Half',
                               groupValue: _sherwaniType,
-                              onChanged: _measurementsLocked ? null : (v) => setState(() => _sherwaniType = v!),
-                              activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                              onChanged: _measurementsLocked
+                                  ? null
+                                  : (v) => setState(() => _sherwaniType = v!),
+                              activeColor: kAccent,
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
                             ),
                           ),
                           Expanded(
                             child: RadioListTile<String>(
-                              title: Text('Full', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
+                              title: Text(
+                                'Full',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               value: 'Full',
                               groupValue: _sherwaniType,
-                              onChanged: _measurementsLocked ? null : (v) => setState(() => _sherwaniType = v!),
-                              activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
+                              onChanged: _measurementsLocked
+                                  ? null
+                                  : (v) => setState(() => _sherwaniType = v!),
+                              activeColor: kAccent,
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
                             ),
                           ),
                         ],
                       ),
-                    ]
+                    ],
                   ],
                 ),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 5. Chest
-                _buildCompactMeasureField('Chest', _chestCtrl, readOnly: _measurementsLocked),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                _buildCompactMeasureField(
+                  'Chest',
+                  _chestCtrl,
+                  readOnly: _measurementsLocked,
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 6. Waist
-                _buildCompactMeasureField('Waist', _waistCtrl, readOnly: _measurementsLocked),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                _buildCompactMeasureField(
+                  'Waist',
+                  _waistCtrl,
+                  readOnly: _measurementsLocked,
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 7. Hip
-                _buildCompactMeasureField('Hip', _hipCtrl, readOnly: _measurementsLocked),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                _buildCompactMeasureField(
+                  'Hip',
+                  _hipCtrl,
+                  readOnly: _measurementsLocked,
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 8. Shalwar
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildCompactMeasureField('Shalwar', _shalwarCtrl, readOnly: _measurementsLocked),
+                    _buildCompactMeasureField(
+                      'Shalwar',
+                      _shalwarCtrl,
+                      readOnly: _measurementsLocked,
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(child: _buildOptionCheckbox('Kanto', _shalKanto, _measurementsLocked ? null : (v) => setState(() => _shalKanto = v))),
-                        Expanded(child: _buildOptionCheckbox('Zip Pocket', _shalZipPocket, _measurementsLocked ? null : (v) => setState(() => _shalZipPocket = v))),
-                        Expanded(child: _buildOptionCheckbox('Width', _shalWidth, _measurementsLocked ? null : (v) => setState(() => _shalWidth = v))),
+                        Expanded(
+                          child: _buildOptionCheckbox(
+                            'Kanto',
+                            _shalKanto,
+                            _measurementsLocked
+                                ? null
+                                : (v) => setState(() => _shalKanto = v),
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildOptionCheckbox(
+                            'Zip Pocket',
+                            _shalZipPocket,
+                            _measurementsLocked
+                                ? null
+                                : (v) => setState(() => _shalZipPocket = v),
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildOptionCheckbox(
+                            'Width',
+                            _shalWidth,
+                            _measurementsLocked
+                                ? null
+                                : (v) => setState(() => _shalWidth = v),
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 9. Bottom
-                _buildCompactMeasureField('Bottom', _bottomCtrl, readOnly: _measurementsLocked),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                _buildCompactMeasureField(
+                  'Bottom',
+                  _bottomCtrl,
+                  readOnly: _measurementsLocked,
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 10. Plate
-                _buildCompactMeasureField('Plate', _plateCtrl, readOnly: _measurementsLocked),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                _buildCompactMeasureField(
+                  'Plate',
+                  _plateCtrl,
+                  readOnly: _measurementsLocked,
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 11. Front Pocket
                 Row(
@@ -872,69 +1176,132 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                   children: [
                     Expanded(
                       flex: 1,
-                      child: _buildOptionCheckbox('Front Pocket', _optFrontPocket, _measurementsLocked ? null : (v) => setState(() => _optFrontPocket = v)),
+                      child: _buildOptionCheckbox(
+                        'Front Pocket',
+                        _optFrontPocket,
+                        _measurementsLocked
+                            ? null
+                            : (v) => setState(() => _optFrontPocket = v),
+                      ),
                     ),
                     if (_optFrontPocket)
                       Expanded(
                         flex: 1,
-                        child: _buildCompactMeasureField('', _frontPocketCtrl, readOnly: _measurementsLocked),
+                        child: _buildCompactMeasureField(
+                          '',
+                          _frontPocketCtrl,
+                          readOnly: _measurementsLocked,
+                        ),
                       )
                     else
                       const Spacer(),
                   ],
                 ),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 12. Side Pocket
-                _buildOptionCheckbox('Side Pocket', _optSidePocket, _measurementsLocked ? null : (v) => setState(() => _optSidePocket = v)),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                _buildOptionCheckbox(
+                  'Side Pocket',
+                  _optSidePocket,
+                  _measurementsLocked
+                      ? null
+                      : (v) => setState(() => _optSidePocket = v),
+                ),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 13. Cuff
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Cuff', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+                    Text(
+                      'Cuff',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextPri,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 8,
                       runSpacing: 0,
-                      children: ['Round', 'Double kaj', 'Double', 'Square'].map((type) {
-                        return SizedBox(
-                          width: 140,
-                          child: RadioListTile<String>(
-                            title: Text(type, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500)),
-                            value: type,
-                            groupValue: _cuffType,
-                            onChanged: _measurementsLocked ? null : (v) => setState(() => _cuffType = v!),
-                            activeColor: kAccent, contentPadding: EdgeInsets.zero, visualDensity: VisualDensity.compact,
-                          ),
-                        );
-                      }).toList(),
+                      children: ['Round', 'Double kaj', 'Double', 'Square'].map(
+                        (type) {
+                          return SizedBox(
+                            width: 140,
+                            child: RadioListTile<String>(
+                              title: Text(
+                                type,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              value: type,
+                              groupValue: _cuffType,
+                              onChanged: _measurementsLocked
+                                  ? null
+                                  : (v) => setState(() => _cuffType = v!),
+                              activeColor: kAccent,
+                              contentPadding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          );
+                        },
+                      ).toList(),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12), const Divider(), const SizedBox(height: 12),
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
 
                 // 14. Extra
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Extra', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+                    Text(
+                      'Extra',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextPri,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     TextField(
                       controller: _extraCtrl,
                       readOnly: _measurementsLocked,
                       maxLines: 3,
-                      style: GoogleFonts.inter(fontSize: 14, color: _measurementsLocked ? kTextSec : kTextPri),
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: _measurementsLocked ? kTextSec : kTextPri,
+                      ),
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: _measurementsLocked ? Colors.grey.shade100 : kBg,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        fillColor: _measurementsLocked
+                            ? Colors.grey.shade100
+                            : kBg,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: _measurementsLocked ? Colors.grey.shade300 : Colors.grey.shade200),
+                          borderSide: BorderSide(
+                            color: _measurementsLocked
+                                ? Colors.grey.shade300
+                                : Colors.grey.shade200,
+                          ),
                         ),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kAccent)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: kAccent),
+                        ),
                       ),
                     ),
                   ],
@@ -950,13 +1317,24 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     );
   }
 
-  Widget _buildCompactMeasureField(String label, TextEditingController ctrl, {bool readOnly = false}) {
+  Widget _buildCompactMeasureField(
+    String label,
+    TextEditingController ctrl, {
+    bool readOnly = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (label.isNotEmpty) ...[
-          Text(label, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: kTextPri,
+            ),
+          ),
           const SizedBox(height: 4),
         ],
         SizedBox(
@@ -971,7 +1349,10 @@ class _AddOrderScreenState extends State<AddOrderScreen>
               color: readOnly ? kTextSec : kTextPri,
             ),
             decoration: InputDecoration(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 0,
+              ),
               filled: true,
               fillColor: readOnly ? Colors.grey.shade100 : kBg,
               border: OutlineInputBorder(
@@ -998,13 +1379,20 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     );
   }
 
-  Widget _buildOptionCheckbox(String title, bool value, ValueChanged<bool>? onChanged) {
+  Widget _buildOptionCheckbox(
+    String title,
+    bool value,
+    ValueChanged<bool>? onChanged,
+  ) {
     return CheckboxListTile(
-      title: Text(title, style: GoogleFonts.inter(
-        fontSize: 13,
-        fontWeight: FontWeight.w500,
-        color: onChanged == null ? kTextSec : kTextPri,
-      )),
+      title: Text(
+        title,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: onChanged == null ? kTextSec : kTextPri,
+        ),
+      ),
       value: value,
       onChanged: onChanged != null ? (v) => onChanged(v!) : null,
       controlAffinity: ListTileControlAffinity.leading,
@@ -1028,9 +1416,14 @@ class _AddOrderScreenState extends State<AddOrderScreen>
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 side: BorderSide(color: Colors.grey.shade300),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(kR),
+                ),
               ),
-              child: Text('Back', style: GoogleFonts.inter(fontSize: 16, color: kTextPri)),
+              child: Text(
+                'Back',
+                style: GoogleFonts.inter(fontSize: 16, color: kTextPri),
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -1044,11 +1437,16 @@ class _AddOrderScreenState extends State<AddOrderScreen>
               backgroundColor: kAccent,
               foregroundColor: Colors.white,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(kR),
+              ),
             ),
             child: Text(
               _currentStep == 3 ? 'Confirm Order' : 'Next Step',
-              style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold),
+              style: GoogleFonts.inter(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
@@ -1085,7 +1483,14 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: kPrimary)),
+          Text(
+            title,
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: kPrimary,
+            ),
+          ),
           const SizedBox(height: 20),
           child,
         ],
@@ -1120,7 +1525,14 @@ class _InputField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: kTextPri)),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: kTextPri,
+          ),
+        ),
         const SizedBox(height: 8),
         TextFormField(
           controller: controller,
@@ -1131,19 +1543,35 @@ class _InputField extends StatelessWidget {
           style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.inter(color: Colors.grey.shade400, fontWeight: FontWeight.w400),
-            prefixIcon: icon != null ? Icon(icon, color: kTextSec, size: 20) : null,
+            hintStyle: GoogleFonts.inter(
+              color: Colors.grey.shade400,
+              fontWeight: FontWeight.w400,
+            ),
+            prefixIcon: icon != null
+                ? Icon(icon, color: kTextSec, size: 20)
+                : null,
             filled: true,
             fillColor: kBg,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kAccent, width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: kAccent, width: 1.5),
+            ),
             errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade300)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red.shade300),
+            ),
             focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.red.shade400, width: 1.5)),
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.red.shade400, width: 1.5),
+            ),
           ),
         ),
       ],

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'login_screen.dart';
 import 'tailor_icon.dart';
+import 'controllers/profile_controller.dart';
 
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
@@ -140,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               FadeTransition(
                 opacity: _titleFadeAnimation,
                 child: Text(
-                  'Irfan Tailors',
+                  ProfileController().profile?.shopName ?? 'Irfan Tailors',
                   style: GoogleFonts.inter(
                     color: kTextWhite,
                     fontSize: 36,

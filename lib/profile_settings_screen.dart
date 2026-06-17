@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'tailor_icon.dart';
-
+import 'controllers/profile_controller.dart';
+import 'models/profile_model.dart';
+import 'services/backup_export_service.dart';
+import 'controllers/order_controller.dart';
+import 'controllers/expense_controller.dart';
 const Color kPrimaryColor = Color(0xFF1E3A5F);
 const Color kAccentColor = Color(0xFF10B981);
 const Color kBackgroundColor = Color(0xFFF8FAFC);
@@ -19,10 +23,20 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
+  final ProfileController _profileController = ProfileController();
+  final OrderController _orderController = OrderController();
+  final ExpenseController _expenseController = ExpenseController();
+
+  void _onStateChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
+    _profileController.addListener(_onStateChanged);
+    _orderController.addListener(_onStateChanged);
+    _expenseController.addListener(_onStateChanged);
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -39,6 +53,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
 
   @override
   void dispose() {
+    _profileController.removeListener(_onStateChanged);
+    _orderController.removeListener(_onStateChanged);
+    _expenseController.removeListener(_onStateChanged);
     _animationController.dispose();
     super.dispose();
   }
@@ -121,6 +138,14 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
   }
 
   void _showEditProfileSheet() {
+    final profile = _profileController.profile;
+    if (profile == null) return;
+    
+    final shopNameController = TextEditingController(text: profile.shopName);
+    final ownerNameController = TextEditingController(text: profile.ownerName);
+    final phoneController = TextEditingController(text: profile.phone);
+    final addressController = TextEditingController(text: profile.address);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -150,13 +175,13 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                _buildTextField('Shop Name', 'Irfan Tailors'),
+                _buildTextField('Shop Name', shopNameController),
                 const SizedBox(height: 16),
-                _buildTextField('Owner Name', 'Muhammad Irfan'),
+                _buildTextField('Owner Name', ownerNameController),
                 const SizedBox(height: 16),
-                _buildTextField('Contact Number', '0300-1234567'),
+                _buildTextField('Contact Number', phoneController),
                 const SizedBox(height: 16),
-                _buildTextField('Address', 'Larkana, Sindh'),
+                _buildTextField('Address', addressController),
                 const SizedBox(height: 32),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -166,7 +191,17 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () => Navigator.pop(ctx),
+                  onPressed: () async {
+                    final updated = ProfileModel(
+                      id: profile.id,
+                      shopName: shopNameController.text,
+                      ownerName: ownerNameController.text,
+                      phone: phoneController.text,
+                      address: addressController.text,
+                    );
+                    await _profileController.updateProfile(updated);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  },
                   child: Text(
                     'Save Changes',
                     style: GoogleFonts.inter(
@@ -185,9 +220,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     );
   }
 
-  Widget _buildTextField(String label, String initialValue) {
+  Widget _buildTextField(String label, TextEditingController controller) {
     return TextFormField(
-      initialValue: initialValue,
+      controller: controller,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: GoogleFonts.inter(color: kTextSecondary),
@@ -216,9 +251,13 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     _showGenericSheet(
       title: 'Backup Data',
       description:
-          'Securely save your orders, customers, and measurements to the cloud.',
+          'Securely save your orders, customers, and measurements to the local storage.',
       actionLabel: 'Backup Now',
       icon: Icons.cloud_upload_outlined,
+      onAction: () async {
+        Navigator.pop(context);
+        await BackupExportService.createBackup(context);
+      },
     );
   }
 
@@ -253,13 +292,11 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                   Icons.picture_as_pdf_outlined,
                   'Export as PDF',
                   Colors.red,
-                ),
-                const SizedBox(height: 12),
-                _buildExportOption(
-                  ctx,
-                  Icons.table_chart_outlined,
-                  'Export as Excel',
-                  Colors.green,
+                  'Generates a PDF document',
+                  () async {
+                    Navigator.pop(ctx);
+                    await BackupExportService.exportToPDF(context);
+                  },
                 ),
                 const SizedBox(height: 16),
               ],
@@ -275,9 +312,11 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     IconData icon,
     String label,
     Color color,
+    String subtitle,
+    VoidCallback onTap,
   ) {
     return InkWell(
-      onTap: () => Navigator.pop(ctx),
+      onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
@@ -289,12 +328,26 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
           children: [
             Icon(icon, color: color),
             const SizedBox(width: 16),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: kTextPrimary,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: kTextSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -403,7 +456,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
   void _showRateSheet() {
     _showGenericSheet(
       title: 'Rate App',
-      description: 'Are you enjoying the Irfan Tailors app? Let us know!',
+      description: 'Are you enjoying the ${ProfileController().profile?.shopName ?? 'Tailor App'} app? Let us know!',
       actionLabel: 'Submit 5 Stars ⭐',
       icon: Icons.star_border,
       iconColor: Colors.amber,
@@ -416,6 +469,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     required String actionLabel,
     required IconData icon,
     Color iconColor = kPrimaryColor,
+    VoidCallback? onAction,
   }) {
     showModalBottomSheet(
       context: context,
@@ -458,7 +512,13 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () => Navigator.pop(ctx),
+                  onPressed: () {
+                    if (onAction != null) {
+                      onAction();
+                    } else {
+                      Navigator.pop(ctx);
+                    }
+                  },
                   child: Text(
                     actionLabel,
                     style: GoogleFonts.inter(
@@ -516,7 +576,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                     child: _buildStatCard(
                       Icons.shopping_bag_outlined,
                       'Orders',
-                      '248',
+                      '${_orderController.orders.length}',
                       kPrimaryColor,
                     ),
                   ),
@@ -525,7 +585,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                     child: _buildStatCard(
                       Icons.people_outline,
                       'Customers',
-                      '156',
+                      '${_orderController.customers.length}',
                       kAccentColor,
                     ),
                   ),
@@ -534,7 +594,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                     child: _buildStatCard(
                       Icons.account_balance_wallet_outlined,
                       'Revenue',
-                      '45k',
+                      '${_orderController.orders.fold<double>(0, (sum, o) => sum + (o.status == 'Delivered' ? o.totalAmount : o.advancePaid)) - _expenseController.expenses.fold<double>(0, (sum, e) => sum + e.amount)}',
                       Colors.purple,
                     ),
                   ),
@@ -600,6 +660,10 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
   }
 
   Widget _buildProfileCard() {
+    if (_profileController.isLoading || _profileController.profile == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final profile = _profileController.profile!;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -641,7 +705,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Irfan Tailors',
+                  profile.shopName,
                   style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 24,
@@ -650,12 +714,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Muhammad Irfan',
+                  profile.ownerName,
                   style: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '0300-1234567 • Larkana, Sindh',
+                  '${profile.phone} • ${profile.address}',
                   style: GoogleFonts.inter(color: Colors.white70, fontSize: 12),
                 ),
               ],

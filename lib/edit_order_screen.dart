@@ -1,7 +1,13 @@
+// ignore_for_file: deprecated_member_use
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'customers_screen.dart';
+import 'package:intl/intl.dart';
+
+import '../models/customer_model.dart';
+import '../models/measurement_model.dart';
+import '../models/order_model.dart';
+import '../controllers/order_controller.dart';
 
 // --- Design System Constants ---
 const Color kPrimary = Color(0xFF1E3A5F);
@@ -13,7 +19,14 @@ const Color kTextSec = Color(0xFF64748B);
 const double kR = 16.0;
 
 class EditOrderScreen extends StatefulWidget {
-  const EditOrderScreen({super.key});
+  final OrderModel order;
+  final CustomerModel customer;
+
+  const EditOrderScreen({
+    super.key,
+    required this.order,
+    required this.customer,
+  });
 
   @override
   State<EditOrderScreen> createState() => _EditOrderScreenState();
@@ -25,38 +38,37 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
 
   int _currentStep = 0;
 
-  // Dummy Pre-filled Data
-  final String _customerName = "Ahmed Ali";
-  final String _customerPhone = "+92 300 1234567";
+  late String _customerName;
+  late String _customerPhone;
 
-  String _status = 'In Progress';
-  String _unit = 'inches';
+  late String _status;
+  final OrderController _orderController = OrderController();
 
   // --- 14-Point Measurement State ---
-  bool _measurementsLocked = false;
-  final _lengthCtrl = TextEditingController(text: '40');
-  final _armCtrl = TextEditingController(text: '24');
+  final bool _measurementsLocked = false;
+  final _lengthCtrl = TextEditingController();
+  final _armCtrl = TextEditingController();
   bool _optMundo = false;
-  final _shoulderCtrl = TextEditingController(text: '18');
-  final _collarCtrl = TextEditingController(text: '15');
+  final _shoulderCtrl = TextEditingController();
+  final _collarCtrl = TextEditingController();
   bool _colRegular = true;
   bool _colFrench = false;
   bool _colSherwani = false;
   String _sherwaniType = 'Half';
-  final _chestCtrl = TextEditingController(text: '42');
-  final _waistCtrl = TextEditingController(text: '34');
-  final _hipCtrl = TextEditingController(text: '40');
-  final _shalwarCtrl = TextEditingController(text: '38');
+  final _chestCtrl = TextEditingController();
+  final _waistCtrl = TextEditingController();
+  final _hipCtrl = TextEditingController();
+  final _shalwarCtrl = TextEditingController();
   bool _shalKanto = false;
   bool _shalZipPocket = false;
   bool _shalWidth = false;
-  final _bottomCtrl = TextEditingController(text: '14');
-  final _plateCtrl = TextEditingController(text: '');
+  final _bottomCtrl = TextEditingController();
+  final _plateCtrl = TextEditingController();
   bool _optFrontPocket = true;
-  final _frontPocketCtrl = TextEditingController(text: '');
+  final _frontPocketCtrl = TextEditingController();
   bool _optSidePocket = false;
   String _cuffType = 'Round'; // Round, Double kaj, Double, Square
-  final _extraCtrl = TextEditingController(text: '');
+  final _extraCtrl = TextEditingController();
 
   double get _totalAmount    => double.tryParse(_totalAmountCtrl.text) ?? 0;
   double get _advancePaid    => double.tryParse(_advancePaidCtrl.text) ?? 0;
@@ -64,12 +76,67 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
 
   final List<String> _statuses = ['Pending', 'In Progress', 'Ready', 'Delivered'];
 
-  final TextEditingController _specialNotesCtrl = TextEditingController(text: 'Tight fit on the waist.');
-  final TextEditingController _quantityCtrl     = TextEditingController(text: '2');
-  final TextEditingController _orderDateCtrl    = TextEditingController(text: '01 Jun 2026');
-  final TextEditingController _deliveryDateCtrl = TextEditingController(text: '12 Jun 2026');
-  final TextEditingController _totalAmountCtrl  = TextEditingController(text: '5000');
-  final TextEditingController _advancePaidCtrl  = TextEditingController(text: '2000');
+  final TextEditingController _specialNotesCtrl = TextEditingController();
+  final TextEditingController _quantityCtrl     = TextEditingController();
+  final TextEditingController _orderDateCtrl    = TextEditingController();
+  final TextEditingController _deliveryDateCtrl = TextEditingController();
+  final TextEditingController _totalAmountCtrl  = TextEditingController();
+  final TextEditingController _advancePaidCtrl  = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _customerName = widget.customer.name;
+    _customerPhone = widget.customer.phone;
+    _status = widget.order.status;
+
+    _quantityCtrl.text = widget.order.quantity.toString();
+    _totalAmountCtrl.text = widget.order.totalAmount.toString();
+    _advancePaidCtrl.text = widget.order.advancePaid.toString();
+
+    final DateFormat formatter = DateFormat('dd MMM yyyy');
+    try {
+      _orderDateCtrl.text = formatter.format(widget.order.orderDate);
+      _deliveryDateCtrl.text = formatter.format(widget.order.deliveryDate);
+    } catch (e) {
+      _orderDateCtrl.text = widget.order.orderDate.toString();
+      _deliveryDateCtrl.text = widget.order.deliveryDate.toString();
+    }
+
+    _populateMeasurements();
+  }
+
+  void _populateMeasurements() {
+    try {
+      final m = widget.order.measurements;
+      
+      _lengthCtrl.text = m.lengthMeasure ?? '';
+      _armCtrl.text = m.armMeasure ?? '';
+      _optMundo = m.optMundo;
+      _shoulderCtrl.text = m.shoulderMeasure ?? '';
+      _collarCtrl.text = m.collarMeasure ?? '';
+      _colRegular = m.colRegular;
+      _colFrench = m.colFrench;
+      _colSherwani = m.colSherwani;
+      _sherwaniType = m.sherwaniType;
+      _chestCtrl.text = m.chestMeasure ?? '';
+      _waistCtrl.text = m.waistMeasure ?? '';
+      _hipCtrl.text = m.hipMeasure ?? '';
+      _shalwarCtrl.text = m.shalwarMeasure ?? '';
+      _shalKanto = m.shalKanto;
+      _shalZipPocket = m.shalZipPocket;
+      _shalWidth = m.shalWidth;
+      _bottomCtrl.text = m.bottomMeasure ?? '';
+      _plateCtrl.text = m.plateMeasure ?? '';
+      _optFrontPocket = m.optFrontPocket;
+      _frontPocketCtrl.text = m.frontPocketMeasure ?? '';
+      _optSidePocket = m.optSidePocket;
+      _cuffType = m.cuffType;
+      _extraCtrl.text = m.extraNotes ?? '';
+    } catch (e) {
+      debugPrint('Error parsing measurements: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -165,9 +232,76 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context); // Close sheet
-                    Navigator.pop(context); // Go back to details/orders
+                  onPressed: () async {
+                    final MeasurementModel newMeasurements = MeasurementModel(
+                      lengthMeasure: _lengthCtrl.text,
+                      armMeasure: _armCtrl.text,
+                      optMundo: _optMundo,
+                      shoulderMeasure: _shoulderCtrl.text,
+                      collarMeasure: _collarCtrl.text,
+                      colRegular: _colRegular,
+                      colFrench: _colFrench,
+                      colSherwani: _colSherwani,
+                      sherwaniType: _sherwaniType,
+                      chestMeasure: _chestCtrl.text,
+                      waistMeasure: _waistCtrl.text,
+                      hipMeasure: _hipCtrl.text,
+                      shalwarMeasure: _shalwarCtrl.text,
+                      shalKanto: _shalKanto,
+                      shalZipPocket: _shalZipPocket,
+                      shalWidth: _shalWidth,
+                      bottomMeasure: _bottomCtrl.text,
+                      plateMeasure: _plateCtrl.text,
+                      optFrontPocket: _optFrontPocket,
+                      frontPocketMeasure: _frontPocketCtrl.text,
+                      optSidePocket: _optSidePocket,
+                      cuffType: _cuffType,
+                      extraNotes: _extraCtrl.text,
+                    );
+
+                    final updatedOrder = widget.order.copyWith(
+                      status: _status,
+                      orderDate: DateFormat('dd MMM yyyy').parse(_orderDateCtrl.text),
+                      deliveryDate: DateFormat('dd MMM yyyy').parse(_deliveryDateCtrl.text),
+                      quantity: int.tryParse(_quantityCtrl.text) ?? 1,
+                      totalAmount: _totalAmount,
+                      advancePaid: _advancePaid,
+                      measurements: newMeasurements,
+                    );
+
+                    try {
+                      await _orderController.updateOrder(updatedOrder);
+                      if (context.mounted) {
+                        Navigator.pop(context); // Close sheet
+                        Navigator.pop(context, updatedOrder); // Go back with updated order
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Order updated successfully!',
+                              style: GoogleFonts.inter(color: Colors.white),
+                            ),
+                            backgroundColor: kAccent,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        Navigator.pop(context); // Close sheet
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Error updating order: $e',
+                              style: GoogleFonts.inter(color: Colors.white),
+                            ),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kAccent,
@@ -348,31 +482,6 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                   style: GoogleFonts.inter(fontSize: 13, color: kTextSec),
                 ),
               ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => CustomerProfileScreen(
-                  customer: CustomerModel(
-                    id: '101',
-                    name: _customerName,
-                    phone: _customerPhone,
-                    totalOrders: 12,
-                    pendingDues: 0,
-                  ),
-                )),
-              );
-            },
-            child: Text(
-              'View Customer',
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: kPrimary,
-                fontWeight: FontWeight.w600,
-                decoration: TextDecoration.underline,
-              ),
             ),
           ),
         ],

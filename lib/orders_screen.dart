@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+
+import '../models/order_model.dart';
+import '../controllers/order_controller.dart';
 import 'order_detail_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────
-//  Design System Constants (shared with rest of app)
+//  Design System Constants
 // ─────────────────────────────────────────────────────────────────
 const Color kPrimaryColor = Color(0xFF1E3A5F);
 const Color kAccentColor = Color(0xFF10B981);
@@ -12,29 +16,6 @@ const Color kCardColor = Color(0xFFFFFFFF);
 const Color kTextPrimary = Color(0xFF0F172A);
 const Color kTextSecondary = Color(0xFF64748B);
 const double kRadius = 16.0;
-
-// ─────────────────────────────────────────────────────────────────
-//  Order Model (dummy data)
-// ─────────────────────────────────────────────────────────────────
-class OrderModel {
-  final String id;
-  final String customerId;
-  final String customerName;
-  final String dressType;
-  final String deliveryDate;
-  final double amount;
-  String status; // mutable so swipe-right can update it
-
-  OrderModel({
-    required this.id,
-    required this.customerId,
-    required this.customerName,
-    required this.dressType,
-    required this.deliveryDate,
-    required this.amount,
-    required this.status,
-  });
-}
 
 // ─────────────────────────────────────────────────────────────────
 //  OrdersScreen
@@ -47,109 +28,11 @@ class OrdersScreen extends StatefulWidget {
 }
 
 class _OrdersScreenState extends State<OrdersScreen> {
-  // Active filter chip
   String _activeFilter = 'All';
-
-  // Search query
   String _searchQuery = '';
-
   final TextEditingController _searchController = TextEditingController();
+  final OrderController _controller = OrderController();
 
-  // Dummy dataset
-  final List<OrderModel> _allOrders = [
-    OrderModel(
-      id: '#ORD-001',
-      customerId: '101',
-      customerName: 'Ahmed Ali',
-      dressType: '3-Piece Suit',
-      deliveryDate: '12 Jun 2026',
-      amount: 8500,
-      status: 'Pending',
-    ),
-    OrderModel(
-      id: '#ORD-002',
-      customerId: '102',
-      customerName: 'Sara Khan',
-      dressType: 'Kurta Shalwar',
-      deliveryDate: '14 Jun 2026',
-      amount: 3200,
-      status: 'In Progress',
-    ),
-    OrderModel(
-      id: '#ORD-003',
-      customerId: '103',
-      customerName: 'Usman Tariq',
-      dressType: 'Formal Pant',
-      deliveryDate: '10 Jun 2026',
-      amount: 1800,
-      status: 'Ready',
-    ),
-    OrderModel(
-      id: '#ORD-004',
-      customerId: '104',
-      customerName: 'Aisha Bibi',
-      dressType: 'Wedding Dress',
-      deliveryDate: '08 Jun 2026',
-      amount: 15000,
-      status: 'Delivered',
-    ),
-    OrderModel(
-      id: '#ORD-005',
-      customerId: '105',
-      customerName: 'Bilal Malik',
-      dressType: '2-Piece Suit',
-      deliveryDate: '15 Jun 2026',
-      amount: 6500,
-      status: 'Pending',
-    ),
-    OrderModel(
-      id: '#ORD-006',
-      customerId: '106',
-      customerName: 'Nadia Iqbal',
-      dressType: 'Shirt',
-      deliveryDate: '16 Jun 2026',
-      amount: 1200,
-      status: 'In Progress',
-    ),
-    OrderModel(
-      id: '#ORD-007',
-      customerId: '107',
-      customerName: 'Tariq Mehmood',
-      dressType: 'Waistcoat',
-      deliveryDate: '18 Jun 2026',
-      amount: 2500,
-      status: 'Ready',
-    ),
-    OrderModel(
-      id: '#ORD-008',
-      customerId: '108',
-      customerName: 'Hina Baig',
-      dressType: 'Lace Frock',
-      deliveryDate: '20 Jun 2026',
-      amount: 9000,
-      status: 'Pending',
-    ),
-    OrderModel(
-      id: '#ORD-009',
-      customerId: '109',
-      customerName: 'Kamran Shah',
-      dressType: 'Shalwar Kameez',
-      deliveryDate: '22 Jun 2026',
-      amount: 2800,
-      status: 'Delivered',
-    ),
-    OrderModel(
-      id: '#ORD-010',
-      customerId: '110',
-      customerName: 'Saba Riaz',
-      dressType: 'Bridal Suit',
-      deliveryDate: '25 Jun 2026',
-      amount: 22000,
-      status: 'In Progress',
-    ),
-  ];
-
-  // Filter chips definition
   final List<String> _filters = [
     'All',
     'Pending',
@@ -158,16 +41,17 @@ class _OrdersScreenState extends State<OrdersScreen> {
     'Delivered',
   ];
 
-  /// Returns orders filtered by chip + search query
   List<OrderModel> get _filteredOrders {
-    return _allOrders.where((o) {
-      final matchesFilter = _activeFilter == 'All' || o.status == _activeFilter;
+    return _controller.orders.where((o) {
+      final matchesFilter =
+          _activeFilter == 'All' || o.status == _activeFilter;
       final query = _searchQuery.toLowerCase();
+      final customerName = _controller.getCustomerName(o.customerId);
       final matchesSearch =
           query.isEmpty ||
-          o.customerName.toLowerCase().contains(query) ||
-          o.dressType.toLowerCase().contains(query) ||
-          o.id.toLowerCase().contains(query);
+          customerName.toLowerCase().contains(query) ||
+          o.id.toLowerCase().contains(query) ||
+          o.status.toLowerCase().contains(query);
       return matchesFilter && matchesSearch;
     }).toList();
   }
@@ -178,12 +62,14 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.dispose();
   }
 
-  // ── Mark an order as Delivered (swipe-right action) ──
-  void _markDelivered(OrderModel order) {
-    setState(() => order.status = 'Delivered');
+  void _markDelivered(OrderModel order) async {
+    await _controller.updateOrderStatus(order.id, 'Delivered');
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${order.customerName}\'s order marked as Delivered'),
+        content: Text(
+          '${_controller.getCustomerName(order.customerId)}\'s order marked as Delivered',
+        ),
         backgroundColor: kAccentColor,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -191,7 +77,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // ── Show edit bottom sheet (swipe-left action) ──
   void _showEditSheet(OrderModel order) {
     showModalBottomSheet(
       context: context,
@@ -199,55 +84,58 @@ class _OrdersScreenState extends State<OrdersScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => _EditOrderSheet(
-        order: order,
-        onSave: (newStatus) {
-          setState(() => order.status = newStatus);
-        },
-      ),
+      builder:
+          (_) => _EditOrderSheet(
+            order: order,
+            customerName: _controller.getCustomerName(order.customerId),
+            onSave: (newStatus) async {
+              await _controller.updateOrderStatus(order.id, newStatus);
+            },
+          ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final orders = _filteredOrders;
-
-    return Scaffold(
-      backgroundColor: kBgColor,
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          const SizedBox(height: 16),
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _buildSearchBar(),
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final orders = _filteredOrders;
+        return Scaffold(
+          backgroundColor: kBgColor,
+          appBar: _buildAppBar(),
+          body: Column(
+            children: [
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildSearchBar(),
+              ),
+              const SizedBox(height: 16),
+              _buildFilterChips(),
+              const SizedBox(height: 16),
+              Expanded(
+                child:
+                    _controller.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : orders.isEmpty
+                        ? _buildEmptyState()
+                        : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                          physics: const BouncingScrollPhysics(),
+                          itemCount: orders.length,
+                          itemBuilder:
+                              (context, index) =>
+                                  _buildDismissibleCard(orders[index]),
+                        ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          // Horizontal filter chips
-          _buildFilterChips(),
-          const SizedBox(height: 16),
-          // Orders list
-          Expanded(
-            child: orders.isEmpty
-                ? _buildEmptyState()
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: orders.length,
-                    itemBuilder: (context, index) {
-                      return _buildDismissibleCard(orders[index]);
-                    },
-                  ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  AppBar
-  // ─────────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: kCardColor,
@@ -265,16 +153,13 @@ class _OrdersScreenState extends State<OrdersScreen> {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.filter_list_outlined, color: kPrimaryColor),
-          onPressed: () {},
+          icon: const Icon(Icons.refresh_outlined, color: kPrimaryColor),
+          onPressed: () => _controller.loadData(),
         ),
       ],
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Search Bar
-  // ─────────────────────────────────────────────────────────────────
   Widget _buildSearchBar() {
     return Container(
       decoration: BoxDecoration(
@@ -296,19 +181,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
           hintText: 'Search orders...',
           hintStyle: GoogleFonts.inter(color: kTextSecondary),
           prefixIcon: const Icon(Icons.search_outlined, color: kTextSecondary),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(
-                    Icons.close_outlined,
-                    color: kTextSecondary,
-                    size: 20,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                )
-              : null,
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                    icon: const Icon(
+                      Icons.close_outlined,
+                      color: kTextSecondary,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                  : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(kRadius),
             borderSide: BorderSide.none,
@@ -319,9 +205,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Filter Chips
-  // ─────────────────────────────────────────────────────────────────
   Widget _buildFilterChips() {
     return SizedBox(
       height: 40,
@@ -364,20 +247,15 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Dismissible Order Card wrapper
-  // ─────────────────────────────────────────────────────────────────
   Widget _buildDismissibleCard(OrderModel order) {
     return Dismissible(
       key: ValueKey('${order.id}_${order.status}'),
-      // Swipe RIGHT → Mark Delivered (green background)
       background: _swipeBackground(
         alignment: Alignment.centerLeft,
         color: kAccentColor,
         icon: Icons.check_circle_outline,
         label: 'Delivered',
       ),
-      // Swipe LEFT → Edit (navy background)
       secondaryBackground: _swipeBackground(
         alignment: Alignment.centerRight,
         color: kPrimaryColor,
@@ -390,7 +268,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         } else {
           _showEditSheet(order);
         }
-        return false; // Don't actually remove the card
+        return false;
       },
       child: _buildOrderCard(order),
     );
@@ -412,37 +290,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
       alignment: alignment,
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
-          if (alignment == Alignment.centerLeft) ...[
-            Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ] else ...[
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(icon, color: Colors.white, size: 22),
-          ],
-        ],
+        children:
+            alignment == Alignment.centerLeft
+                ? [
+                  Icon(icon, color: Colors.white, size: 22),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ]
+                : [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(icon, color: Colors.white, size: 22),
+                ],
       ),
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Order Card
-  // ─────────────────────────────────────────────────────────────────
   Widget _buildOrderCard(OrderModel order) {
+    final customerName = _controller.getCustomerName(order.customerId);
+    final deliveryFormatted = DateFormat(
+      'd MMM yyyy',
+    ).format(order.deliveryDate);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -460,18 +341,31 @@ class _OrdersScreenState extends State<OrdersScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(kRadius),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrderDetailScreen())),
+          onTap: () {
+            final customer = _controller.getCustomerById(order.customerId);
+            if (customer != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailScreen(
+                    order: order,
+                    customer: customer,
+                  ),
+                ),
+              ).then((_) => _controller.loadData());
+            }
+          },
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Row 1: Order ID + Status badge ──
+                // Row 1: short ID + status
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      order.id,
+                      '#${order.id.length > 8 ? order.id.substring(0, 8).toUpperCase() : order.id.toUpperCase()}',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: kTextSecondary,
@@ -482,7 +376,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                // ── Row 2: Customer name + Amount ──
+                // Row 2: customer name + amount
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -491,7 +385,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          order.customerName,
+                          customerName,
                           style: GoogleFonts.inter(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -499,21 +393,30 @@ class _OrdersScreenState extends State<OrdersScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'ID: ${order.customerId}',
-                          style: GoogleFonts.inter(fontSize: 12, color: kAccentColor, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
                         Row(
                           children: [
                             const Icon(
-                              Icons.checkroom_outlined,
+                              Icons.people_outline,
                               size: 14,
                               color: kTextSecondary,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              order.dressType,
+                              order.isAdult ? 'Adult' : 'Child',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Icon(
+                              Icons.shopping_bag_outlined,
+                              size: 14,
+                              color: kTextSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Qty: ${order.quantity}',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 color: kTextSecondary,
@@ -524,7 +427,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       ],
                     ),
                     Text(
-                      'Rs ${order.amount.toStringAsFixed(0)}',
+                      'Rs ${order.totalAmount.toStringAsFixed(0)}',
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -534,10 +437,9 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // ── Divider ──
                 Container(height: 1, color: Colors.grey.shade100),
                 const SizedBox(height: 10),
-                // ── Row 3: Delivery date + swipe hint ──
+                // Row 3: delivery date + swipe hint
                 Row(
                   children: [
                     const Icon(
@@ -547,7 +449,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Delivery: ${order.deliveryDate}',
+                      'Delivery: $deliveryFormatted',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: kTextSecondary,
@@ -572,9 +474,6 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────
-  //  Empty state
-  // ─────────────────────────────────────────────────────────────────
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -587,7 +486,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'No orders found',
+            'No orders yet',
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -596,7 +495,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Try changing the filter or search term.',
+            'Tap + to add your first order.',
             style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade400),
           ),
         ],
@@ -613,10 +512,10 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge({required this.status});
 
   static Map<String, List<Color>> get _palette => {
-    'Pending': [Color(0xFFFFF7ED), Color(0xFFC2410C)],
-    'In Progress': [Color(0xFFEFF6FF), Color(0xFF1D4ED8)],
-    'Ready': [Color(0xFFECFDF5), kAccentColor],
-    'Delivered': [Color(0xFFF1F5F9), kTextSecondary],
+    'Pending': [const Color(0xFFFFF7ED), const Color(0xFFC2410C)],
+    'In Progress': [const Color(0xFFEFF6FF), const Color(0xFF1D4ED8)],
+    'Ready': [const Color(0xFFECFDF5), kAccentColor],
+    'Delivered': [const Color(0xFFF1F5F9), kTextSecondary],
   };
 
   @override
@@ -646,9 +545,14 @@ class _StatusBadge extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────
 class _EditOrderSheet extends StatefulWidget {
   final OrderModel order;
+  final String customerName;
   final ValueChanged<String> onSave;
 
-  const _EditOrderSheet({required this.order, required this.onSave});
+  const _EditOrderSheet({
+    required this.order,
+    required this.customerName,
+    required this.onSave,
+  });
 
   @override
   State<_EditOrderSheet> createState() => _EditOrderSheetState();
@@ -682,7 +586,6 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 40,
@@ -695,7 +598,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Edit Order',
+            'Update Status',
             style: GoogleFonts.inter(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -704,48 +607,40 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
           ),
           const SizedBox(height: 4),
           Text(
-            widget.order.customerName,
+            widget.customerName,
             style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
           ),
           const SizedBox(height: 24),
-          Text(
-            'Update Status',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: kTextPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Status selection chips
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: _statuses.map((s) {
-              final isSelected = s == _selectedStatus;
-              return ChoiceChip(
-                label: Text(s),
-                selected: isSelected,
-                onSelected: (_) => setState(() => _selectedStatus = s),
-                selectedColor: kAccentColor,
-                backgroundColor: kBgColor,
-                showCheckmark: false,
-                labelStyle: GoogleFonts.inter(
-                  color: isSelected ? Colors.white : kTextSecondary,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  fontSize: 13,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(
-                    color: isSelected ? kAccentColor : Colors.grey.shade300,
-                  ),
-                ),
-              );
-            }).toList(),
+            children:
+                _statuses.map((s) {
+                  final isSelected = s == _selectedStatus;
+                  return ChoiceChip(
+                    label: Text(s),
+                    selected: isSelected,
+                    onSelected: (_) => setState(() => _selectedStatus = s),
+                    selectedColor: kAccentColor,
+                    backgroundColor: kBgColor,
+                    showCheckmark: false,
+                    labelStyle: GoogleFonts.inter(
+                      color: isSelected ? Colors.white : kTextSecondary,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 13,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color:
+                            isSelected ? kAccentColor : Colors.grey.shade300,
+                      ),
+                    ),
+                  );
+                }).toList(),
           ),
           const SizedBox(height: 28),
-          // Save button
           SizedBox(
             width: double.infinity,
             height: 52,

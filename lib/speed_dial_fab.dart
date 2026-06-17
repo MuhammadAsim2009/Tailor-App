@@ -220,7 +220,7 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
                   child: RotationTransition(
                     turns: _rotationAnim,
                     child: FloatingActionButton(
-                      heroTag: 'speed_dial_overlay_fab',
+                      heroTag: null,
                       onPressed: _toggle,
                       backgroundColor: _kAccent,
                       elevation: 6,
@@ -246,7 +246,7 @@ class _SpeedDialFABState extends State<SpeedDialFAB>
       child: RotationTransition(
         turns: _rotationAnim,
         child: FloatingActionButton(
-          heroTag: 'speed_dial_main_fab',
+          heroTag: null,
           onPressed: _toggle,
           backgroundColor: _kAccent,
           elevation: 4,
@@ -293,7 +293,7 @@ class _DialOptionButton extends StatelessWidget {
         const SizedBox(width: 10),
         // Mini circular FAB (right side)
         FloatingActionButton.small(
-          heroTag: 'speed_dial_${option.label}',
+          heroTag: null,
           onPressed: onTap,
           backgroundColor: _kAccent,
           elevation: 3,

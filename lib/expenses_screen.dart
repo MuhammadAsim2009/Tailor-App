@@ -4,6 +4,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'add_expense_screen.dart';
 import 'edit_expense_screen.dart';
+import '../models/expense_model.dart';
+import '../controllers/expense_controller.dart';
+import '../controllers/order_controller.dart';
 
 // --- Design System Constants ---
 const Color kPrimary = Color(0xFF1E3A5F);
@@ -24,8 +27,10 @@ class ExpenseScreen extends StatefulWidget {
 class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
+  final ExpenseController _controller = ExpenseController();
+  final OrderController _orderController = OrderController();
 
-  String _selectedMonth = 'June 2025';
+  DateTime _currentMonth = DateTime.now();
   String _selectedCategory = 'All';
 
   final List<String> _categories = [
@@ -38,14 +43,9 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     '📦 Other'
   ];
 
-  // Mutable so we can delete items from the list
-  final List<_Expense> _dummyExpenses = [
-    _Expense(id: '1', title: 'Shop Rent',       category: '🏠 Rent',        date: 'Today',     amount: 50000, rawDate: DateTime.now()),
-    _Expense(id: '2', title: 'Electricity Bill', category: '⚡ Electricity', date: 'Today',     amount: 15000, rawDate: DateTime.now()),
-    _Expense(id: '3', title: 'Thread & Buttons', category: '🧵 Material',   date: 'Yesterday', amount: 2500,  rawDate: DateTime.now().subtract(const Duration(days: 1))),
-    _Expense(id: '4', title: 'Fabric Rolls',    category: '🧵 Material',    date: '12 June',   amount: 35000, rawDate: DateTime.now().subtract(const Duration(days: 2))),
-    _Expense(id: '5', title: 'Staff Salary',    category: '👤 Salary',      date: '10 June',   amount: 45000, rawDate: DateTime.now().subtract(const Duration(days: 4))),
-  ];
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
@@ -56,36 +56,51 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     );
     _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
     _animController.forward();
+    _controller.addListener(_onControllerChanged);
+    _orderController.addListener(_onControllerChanged);
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onControllerChanged);
+    _orderController.removeListener(_onControllerChanged);
     _animController.dispose();
     super.dispose();
   }
 
   void _changeMonth(int dir) {
     setState(() {
-      _selectedMonth = dir > 0 ? 'July 2025' : 'May 2025';
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + dir);
     });
     _animController.reset();
     _animController.forward();
   }
 
+  // ── Category emoji/icon helper ──
+  String _getCategoryEmoji(String cat) {
+    if (cat.contains('Rent'))        return '🏠';
+    if (cat.contains('Electricity')) return '⚡';
+    if (cat.contains('Material'))    return '🧵';
+    if (cat.contains('Salary'))      return '👤';
+    if (cat.contains('Maintenance')) return '🔧';
+    return '📦';
+  }
+
 
   // ── Navigate to Edit Expense screen ──
-  void _navigateToEdit(_Expense exp) {
+  void _navigateToEdit(ExpenseModel exp) {
     Navigator.push(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, animation, _2) => EditExpenseScreen(
+        pageBuilder: (_, animation, secondaryAnimation) => EditExpenseScreen(
+          expenseId:       exp.id,
           expenseTitle:    exp.title,
           expenseAmount:   exp.amount,
           expenseCategory: exp.category,
-          expenseDate:     exp.rawDate,
-          expenseNotes:    '',
+          expenseDate:     exp.date,
+          expenseNotes:    exp.notes ?? '',
         ),
-        transitionsBuilder: (_, animation, _2, child) => SlideTransition(
+        transitionsBuilder: (_, animation, secondaryAnimation, child) => SlideTransition(
           position: Tween<Offset>(
             begin: const Offset(0, 1),
             end: Offset.zero,
@@ -94,19 +109,19 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
         ),
         transitionDuration: const Duration(milliseconds: 350),
       ),
-    );
+    ).then((_) => _controller.loadExpenses());
   }
 
   // ── Show animated delete confirmation popup ──
-  void _showDeleteConfirmation(_Expense exp) {
+  void _showDeleteConfirmation(ExpenseModel exp) {
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Dismiss',
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (_, __, ___) => const SizedBox.shrink(),
-      transitionBuilder: (ctx, animation, _, __) {
+      pageBuilder: (context, animation, secondaryAnimation) => const SizedBox.shrink(),
+      transitionBuilder: (ctx, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutBack);
         return ScaleTransition(
           scale: curved,
@@ -114,20 +129,22 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
             opacity: animation,
             child: _DeleteConfirmationDialog(
               expense: exp,
-              onDelete: () {
+              onDelete: () async {
                 Navigator.pop(ctx); // close dialog
-                setState(() => _dummyExpenses.removeWhere((e) => e.id == exp.id));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '"${exp.title}" deleted',
-                      style: GoogleFonts.inter(color: Colors.white),
+                await _controller.deleteExpense(exp.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '"${exp.title}" deleted',
+                        style: GoogleFonts.inter(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.red.shade500,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    backgroundColor: Colors.red.shade500,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                );
+                  );
+                }
               },
               onCancel: () => Navigator.pop(ctx),
             ),
@@ -137,19 +154,24 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     );
   }
 
-  void _showExpenseDetail(_Expense exp) {
+  void _showExpenseDetail(ExpenseModel exp) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ExpenseDetailSheet(expense: exp),
+      builder: (_) => _ExpenseDetailSheet(expense: exp, onEdit: () => _navigateToEdit(exp)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Filtered list (by category chip and current month)
+    final monthExpenses = _controller.expenses.where((e) =>
+        e.date.year == _currentMonth.year && e.date.month == _currentMonth.month);
+        
     final filteredExpenses = _selectedCategory == 'All'
-        ? _dummyExpenses
-        : _dummyExpenses.where((e) => e.category == _selectedCategory).toList();
+        ? monthExpenses.toList()
+        : monthExpenses.where((e) =>
+            e.category == _selectedCategory.split(' ').skip(1).join(' ')).toList();
 
     return Scaffold(
       backgroundColor: kBg,
@@ -169,8 +191,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.filter_list_outlined, color: kPrimary),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh_outlined, color: kPrimary),
+            onPressed: () => _controller.loadExpenses(),
           ),
         ],
       ),
@@ -208,12 +230,13 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: null,
         onPressed: () {
           Navigator.push(
             context,
             PageRouteBuilder(
-              pageBuilder: (_, animation, _2) => const AddExpenseScreen(),
-              transitionsBuilder: (_, animation, _2, child) {
+              pageBuilder: (_, animation, secondaryAnimation) => const AddExpenseScreen(),
+              transitionsBuilder: (_, animation, secondaryAnimation, child) {
                 return SlideTransition(
                   position: Tween<Offset>(
                     begin: const Offset(0, 1),
@@ -227,7 +250,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
               },
               transitionDuration: const Duration(milliseconds: 350),
             ),
-          );
+          ).then((_) => _controller.loadExpenses());
         },
         backgroundColor: kAccent,
         elevation: 4,
@@ -237,10 +260,13 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
   }
 
   Widget _buildSummaryCard() {
-    // Dummy calculations
-    double totalIncome = 120000;
-    double totalExpenses = 45000;
-    double netBalance = totalIncome - totalExpenses;
+    final monthExpenses = _controller.expenses.where((e) =>
+        e.date.year == _currentMonth.year && e.date.month == _currentMonth.month);
+    final double totalExpenses = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
+    final double totalIncome = _orderController.orders
+        .where((o) => o.orderDate.year == _currentMonth.year && o.orderDate.month == _currentMonth.month)
+        .fold(0.0, (sum, o) => sum + o.totalAmount);
+    final double netBalance = totalIncome - totalExpenses;
 
     return Container(
       width: double.infinity,
@@ -258,6 +284,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
       ),
       child: Column(
         children: [
+          // Month navigator
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -266,7 +293,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
                 onPressed: () => _changeMonth(-1),
               ),
               Text(
-                _selectedMonth,
+                DateFormat('MMMM yyyy').format(_currentMonth),
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
@@ -321,6 +348,28 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
   }
 
   Widget _buildChartCard() {
+    // Build 6 months of expense data ending at current month
+    final now = _currentMonth;
+    final months = List.generate(6, (i) => DateTime(now.year, now.month - 5 + i));
+    final monthLabels = months.map((m) => DateFormat('MMM').format(m)).toList();
+
+    double maxY = 10;
+    final expenseByMonth = months.map((m) {
+      final total = _controller.expenses
+          .where((e) => e.date.year == m.year && e.date.month == m.month)
+          .fold(0.0, (sum, e) => sum + e.amount) / 1000; // in thousands
+      if (total > maxY) maxY = total;
+      return total;
+    }).toList();
+    final incomeByMonth = months.map((m) {
+      final total = _orderController.orders
+          .where((o) => o.orderDate.year == m.year && o.orderDate.month == m.month)
+          .fold(0.0, (sum, o) => sum + o.totalAmount) / 1000;
+      if (total > maxY) maxY = total;
+      return total;
+    }).toList();
+    maxY = (maxY * 1.3).ceilToDouble().clamp(10, double.infinity);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -351,20 +400,30 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
             child: BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
-                maxY: 150,
-                barTouchData: BarTouchData(enabled: false),
+                maxY: maxY,
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final label = rodIndex == 0 ? 'Income' : 'Expenses';
+                      return BarTooltipItem(
+                        '$label\nPKR ${(rod.toY * 1000).toStringAsFixed(0)}',
+                        GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      );
+                    },
+                  ),
+                ),
                 titlesData: FlTitlesData(
                   show: true,
                   bottomTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        const titles = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-                        if (value.toInt() < 0 || value.toInt() >= titles.length) return const SizedBox();
+                        if (value.toInt() < 0 || value.toInt() >= monthLabels.length) return const SizedBox();
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            titles[value.toInt()],
+                            monthLabels[value.toInt()],
                             style: GoogleFonts.inter(color: kTextSec, fontSize: 11),
                           ),
                         );
@@ -379,7 +438,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
                       getTitlesWidget: (value, meta) {
                         if (value == 0) return const SizedBox();
                         return Text(
-                          '${value.toInt()}k',
+                          '${value.toStringAsFixed(0)}k',
                           style: GoogleFonts.inter(color: kTextSec, fontSize: 11),
                         );
                       },
@@ -394,14 +453,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
                   getDrawingHorizontalLine: (value) => FlLine(color: Colors.grey.shade200, strokeWidth: 1),
                 ),
                 borderData: FlBorderData(show: false),
-                barGroups: [
-                  _buildBarGroup(0, 100, 40),
-                  _buildBarGroup(1, 120, 50),
-                  _buildBarGroup(2, 90, 60),
-                  _buildBarGroup(3, 140, 45),
-                  _buildBarGroup(4, 110, 55),
-                  _buildBarGroup(5, 120, 45),
-                ],
+                barGroups: List.generate(6, (i) => _buildBarGroup(i, incomeByMonth[i], expenseByMonth[i])),
               ),
               duration: const Duration(milliseconds: 800),
               curve: Curves.easeOutCubic,
@@ -506,7 +558,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildExpenseCard(_Expense exp) {
+  Widget _buildExpenseCard(ExpenseModel exp) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Dismissible(
@@ -573,8 +625,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
             leading: CircleAvatar(
               backgroundColor: _getCategoryColor(exp.category).withValues(alpha: 0.1),
               child: Text(
-                exp.category.split(' ').first,
-                style: const TextStyle(fontSize: 18),
+                _getCategoryEmoji(exp.category),
+                style: const TextStyle(fontSize: 20),
               ),
             ),
             title: Text(
@@ -586,12 +638,12 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
               children: [
                 const SizedBox(height: 4),
                 Text(
-                  exp.category.split(' ').skip(1).join(' '),
+                  exp.category,
                   style: GoogleFonts.inter(fontSize: 12, color: kTextSec),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  exp.date,
+                  DateFormat('dd MMM yyyy').format(exp.date),
                   style: GoogleFonts.inter(fontSize: 11, color: kTextSec),
                 ),
               ],
@@ -629,32 +681,15 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
   }
 
   Color _getCategoryColor(String cat) {
-    if (cat.contains('Rent')) return Colors.indigo;
-    if (cat.contains('Electricity')) return Colors.amber;
-    if (cat.contains('Material')) return Colors.purple;
-    if (cat.contains('Salary')) return Colors.teal;
-    if (cat.contains('Maintenance')) return Colors.brown;
+    if (cat.contains('Rent'))        return const Color(0xFF3B82F6);
+    if (cat.contains('Electricity')) return const Color(0xFFEAB308);
+    if (cat.contains('Material'))    return const Color(0xFF8B5CF6);
+    if (cat.contains('Salary'))      return const Color(0xFFF97316);
+    if (cat.contains('Maintenance')) return const Color(0xFFEF4444);
     return Colors.grey;
   }
 }
 
-class _Expense {
-  final String id;
-  final String title;
-  final String category;
-  final String date;
-  final double amount;
-  final DateTime rawDate;
-
-  _Expense({
-    required this.id,
-    required this.title,
-    required this.category,
-    required this.date,
-    required this.amount,
-    required this.rawDate,
-  });
-}
 
 class _AnimatedStat extends StatelessWidget {
   final String label;
@@ -832,9 +867,19 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
 }
 
 class _ExpenseDetailSheet extends StatelessWidget {
-  final _Expense expense;
+  final ExpenseModel expense;
+  final VoidCallback onEdit;
 
-  const _ExpenseDetailSheet({required this.expense});
+  const _ExpenseDetailSheet({required this.expense, required this.onEdit});
+
+  static String _emoji(String cat) {
+    if (cat.contains('Rent'))        return '🏠';
+    if (cat.contains('Electricity')) return '⚡';
+    if (cat.contains('Material'))    return '🧵';
+    if (cat.contains('Salary'))      return '👤';
+    if (cat.contains('Maintenance')) return '🔧';
+    return '📦';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -856,7 +901,7 @@ class _ExpenseDetailSheet extends StatelessWidget {
           CircleAvatar(
             radius: 32,
             backgroundColor: Colors.grey.shade100,
-            child: Text(expense.category.split(' ').first, style: const TextStyle(fontSize: 28)),
+            child: Text(_emoji(expense.category), style: const TextStyle(fontSize: 28)),
           ),
           const SizedBox(height: 16),
           Text(
@@ -876,7 +921,7 @@ class _ExpenseDetailSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              expense.category.split(' ').skip(1).join(' '),
+              expense.category,
               style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: kTextSec),
             ),
           ),
@@ -886,15 +931,41 @@ class _ExpenseDetailSheet extends StatelessWidget {
             children: [
               const Icon(Icons.calendar_today_outlined, size: 16, color: kTextSec),
               const SizedBox(width: 8),
-              Text(expense.date, style: GoogleFonts.inter(color: kTextSec)),
+              Text(DateFormat('dd MMM yyyy').format(expense.date), style: GoogleFonts.inter(color: kTextSec)),
             ],
           ),
+          // ── Notes ──
+          if (expense.notes != null && expense.notes!.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Notes',
+                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSec)),
+                  const SizedBox(height: 6),
+                  Text(expense.notes!,
+                    style: GoogleFonts.inter(fontSize: 13, color: kTextPri, height: 1.5)),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 32),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    onEdit();
+                  },
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Edit'),
                   style: OutlinedButton.styleFrom(
@@ -932,7 +1003,7 @@ class _ExpenseDetailSheet extends StatelessWidget {
 //  _DeleteConfirmationDialog
 // ─────────────────────────────────────────────────────────────────
 class _DeleteConfirmationDialog extends StatelessWidget {
-  final _Expense expense;
+  final ExpenseModel expense;
   final VoidCallback onDelete;
   final VoidCallback onCancel;
 
@@ -1008,7 +1079,7 @@ class _DeleteConfirmationDialog extends StatelessWidget {
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: Colors.white,
-                      child: Text(expense.category.split(' ').first, style: const TextStyle(fontSize: 18)),
+                      child: Text(_ExpenseDetailSheet._emoji(expense.category), style: const TextStyle(fontSize: 18)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1022,7 +1093,7 @@ class _DeleteConfirmationDialog extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            expense.date,
+                            DateFormat('dd MMM yyyy').format(expense.date),
                             style: GoogleFonts.inter(fontSize: 12, color: kTextSec),
                           ),
                         ],

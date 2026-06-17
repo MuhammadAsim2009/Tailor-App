@@ -4,8 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:gal/gal.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:ui' as ui;
+import 'package:intl/intl.dart';
 import 'edit_order_screen.dart';
 import 'receipt_widget.dart';
+import 'models/order_model.dart';
+import 'models/customer_model.dart';
+import 'controllers/order_controller.dart';
+
 // --- Design System Constants ---
 const Color kPrimary = Color(0xFF1E3A5F); // Deep Navy
 const Color kAccent = Color(0xFF10B981); // Emerald Green
@@ -16,27 +22,32 @@ const Color kTextSec = Color(0xFF64748B);
 const double kR = 16.0;
 
 class OrderDetailScreen extends StatefulWidget {
-  const OrderDetailScreen({super.key});
+  final OrderModel order;
+  final CustomerModel customer;
+
+  const OrderDetailScreen({
+    super.key,
+    required this.order,
+    required this.customer,
+  });
 
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProviderStateMixin {
-  // Dummy State Data
-  String _status = 'In Progress'; // Pending, In Progress, Ready, Delivered
-  final double _totalAmount = 5000.0;
-  double _advancePaid = 2000.0;
-  
   bool _isDownloading = false;
   final ScreenshotController _screenshotController = ScreenshotController();
   
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  
+  late OrderModel _currentOrder;
 
   @override
   void initState() {
     super.initState();
+    _currentOrder = widget.order;
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -52,7 +63,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     super.dispose();
   }
 
-  double get _remainingAmount => _totalAmount - _advancePaid;
+  double get _remainingAmount => _currentOrder.totalAmount - _currentOrder.advancePaid;
   bool get _isFullyPaid => _remainingAmount <= 0;
 
   Color _getStatusColor(String status) {
@@ -96,14 +107,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
 
       // Capture receipt widget off-screen as PNG bytes
       final Uint8List bytes = await _screenshotController.captureFromWidget(
-        const Material(
+        Material(
           type: MaterialType.transparency,
           child: Directionality(
-            textDirection: TextDirection.ltr,
+            textDirection: ui.TextDirection.ltr,
             child: FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.topCenter,
-              child: ReceiptWidget(),
+              child: ReceiptWidget(
+                order: _currentOrder,
+                customer: widget.customer,
+              ),
             ),
           ),
         ),
@@ -174,9 +188,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const EditOrderScreen()),
-              );
+                MaterialPageRoute(
+                  builder: (_) => EditOrderScreen(
+                    order: _currentOrder,
+                    customer: widget.customer,
+                  ),
+                ),
+              ).then((updatedOrder) {
+                if (updatedOrder != null && updatedOrder is OrderModel) {
+                  setState(() {
+                    _currentOrder = updatedOrder;
+                  });
+                }
+              });
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: () => _showDeleteConfirmation(),
           ),
         ],
       ),
@@ -229,7 +258,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                 radius: 30,
                 backgroundColor: kAccent.withValues(alpha: 0.1),
                 child: Text(
-                  'AA',
+                  widget.customer.initials,
                   style: GoogleFonts.inter(
                     color: kAccent,
                     fontWeight: FontWeight.bold,
@@ -243,7 +272,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Ahmed Ali',
+                      widget.customer.name,
                       style: GoogleFonts.inter(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -252,12 +281,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'ID: 101',
+                      'ID: ${widget.customer.id}',
                       style: GoogleFonts.inter(fontSize: 13, color: kAccent, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '+92 300 1234567',
+                      widget.customer.phone,
                       style: GoogleFonts.inter(
                         fontSize: 14,
                         color: kTextSec,
@@ -273,7 +302,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '#ORD-001',
+                '#${_currentOrder.id}',
                 style: GoogleFonts.inter(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -286,15 +315,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                     duration: const Duration(milliseconds: 300),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(_status).withValues(alpha: 0.1),
+                      color: _getStatusColor(_currentOrder.status).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _getStatusColor(_status)),
+                      border: Border.all(color: _getStatusColor(_currentOrder.status)),
                     ),
                     child: Text(
-                      _status,
+                      _currentOrder.status,
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: _getStatusColor(_status),
+                        color: _getStatusColor(_currentOrder.status),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -335,9 +364,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             ),
           ),
           const SizedBox(height: 16),
-          _buildAmountRow('Total Amount:', _totalAmount, Colors.white),
+          _buildAmountRow('Total Amount:', _currentOrder.totalAmount, Colors.white),
           const SizedBox(height: 12),
-          _buildAmountRow('Advance Paid:', _advancePaid, kAccent),
+          _buildAmountRow('Advance Paid:', _currentOrder.advancePaid, kAccent),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
@@ -374,10 +403,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      _advancePaid = _totalAmount;
-                    });
+                  onPressed: () async {
+                    try {
+                      await OrderController().markOrderAsPaid(_currentOrder.id, _currentOrder.totalAmount);
+                      if (mounted) {
+                        setState(() {
+                          _currentOrder = _currentOrder.copyWith(advancePaid: _currentOrder.totalAmount);
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Order marked as Paid!',
+                              style: GoogleFonts.inter(color: Colors.white),
+                            ),
+                            backgroundColor: kAccent,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error updating order: $e')),
+                        );
+                      }
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kAccent,
@@ -436,15 +489,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoRow(Icons.calendar_today_outlined, 'Order Date', '01 Jun 2026'),
+          _buildInfoRow(Icons.calendar_today_outlined, 'Order Date', DateFormat('dd MMM yyyy').format(_currentOrder.orderDate)),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.local_shipping_outlined, 'Delivery Date', '12 Jun 2026'),
+          _buildInfoRow(Icons.local_shipping_outlined, 'Delivery Date', DateFormat('dd MMM yyyy').format(_currentOrder.deliveryDate)),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.format_list_numbered_outlined, 'Quantity', '2'),
+          _buildInfoRow(Icons.format_list_numbered_outlined, 'Quantity', _currentOrder.quantity.toString()),
           const SizedBox(height: 16),
           const Divider(height: 1),
           const SizedBox(height: 16),
-          _buildFullWidthNote(Icons.notes_outlined, 'Special Notes', 'Tight fit on the waist, wide leg pants as per reference image.'),
+          _buildFullWidthNote(Icons.notes_outlined, 'Special Notes', _currentOrder.measurements.extraNotes?.isNotEmpty == true ? _currentOrder.measurements.extraNotes! : 'No notes.'),
         ],
       ),
     );
@@ -491,19 +544,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
 
   // 4. MEASUREMENTS CARD
   Widget _buildMeasurementsCard() {
-    final Map<String, String> measurements = {
-      'Length': '40',
-      'Chest': '42',
-      'Waist': '34',
-      'Shoulder': '18',
-      'Hip': '40',
-      'Bottom': '14',
-      'Arm': '24',
-      'Sherwani': 'Half',
-      'Shalwar': '38',
+    final Map<String, String> measurementLabels = {
+      'lengthMeasure': 'Length',
+      'armMeasure': 'Arm',
+      'shoulderMeasure': 'Shoulder',
+      'collarMeasure': 'Collar',
+      'chestMeasure': 'Chest',
+      'waistMeasure': 'Waist',
+      'hipMeasure': 'Hip',
+      'shalwarMeasure': 'Shalwar',
+      'shalWidth': 'Shalwar Width',
+      'bottomMeasure': 'Bottom',
+      'plateMeasure': 'Plate',
+      'frontPocketMeasure': 'Front Pocket',
+      'cuffType': 'Cuff Type',
+      'sherwaniType': 'Sherwani Type',
     };
 
-    final List<String> designOptions = ['Plate', 'Front Pocket', 'Cuff (Rounded)'];
+    final Map<String, String> measurements = {};
+    _currentOrder.measurements.toMap().forEach((key, value) {
+      if (value != null && value.toString().isNotEmpty && value != false && value != 'false') {
+        if (measurementLabels.containsKey(key)) {
+          measurements[measurementLabels[key]!] = value.toString();
+        }
+      }
+    });
+    final List<String> designOptions = _currentOrder.measurements.designOptions;
 
     return _buildSectionCard(
       title: 'Measurements',
@@ -576,10 +642,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
   // 5. TIMELINE CARD
   Widget _buildTimelineCard() {
     final timelineSteps = [
-      {'title': 'Order Placed', 'date': '01 Jun 2026, 10:30 AM', 'done': true},
-      {'title': 'In Progress', 'date': '02 Jun 2026, 09:15 AM', 'done': true},
-      {'title': 'Ready for Pickup', 'date': 'Pending', 'done': false},
-      {'title': 'Delivered', 'date': 'Pending', 'done': false},
+      {'title': 'Order Placed', 'date': DateFormat('dd MMM yyyy').format(_currentOrder.orderDate), 'done': true},
+      {'title': 'In Progress', 'date': _currentOrder.status == 'In Progress' || _currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered' ? DateFormat('dd MMM yyyy').format(_currentOrder.orderDate) : 'Pending', 'done': _currentOrder.status != 'Pending'},
+      {'title': 'Ready for Pickup', 'date': _currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered' ? 'Done' : 'Pending', 'done': _currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered'},
+      {'title': 'Delivered', 'date': _currentOrder.status == 'Delivered' ? DateFormat('dd MMM yyyy').format(_currentOrder.deliveryDate) : 'Pending', 'done': _currentOrder.status == 'Delivered'},
     ];
 
     return _buildSectionCard(
@@ -665,7 +731,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
 
   // 6. BOTTOM ACTIONS
   Widget _buildBottomActions() {
-    final bool isDelivered = _status == 'Delivered';
+    final bool isDelivered = _currentOrder.status == 'Delivered';
 
     if (isDelivered) {
       return const SizedBox.shrink(); // Replaced by _buildDownloadReceiptButton
@@ -680,8 +746,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const EditOrderScreen()),
-                );
+                  MaterialPageRoute(
+                    builder: (_) => EditOrderScreen(
+                      order: _currentOrder,
+                      customer: widget.customer,
+                    ),
+                  ),
+                ).then((updatedOrder) {
+                  if (updatedOrder != null && updatedOrder is OrderModel) {
+                    setState(() {
+                      _currentOrder = updatedOrder;
+                    });
+                  }
+                });
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: kPrimary,
@@ -697,10 +774,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           child: SizedBox(
             height: 54,
             child: ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _status = 'Delivered';
-                });
+              onPressed: () async {
+                try {
+                  await OrderController().updateOrderStatus(_currentOrder.id, 'Delivered');
+                  if (mounted) {
+                    Navigator.pop(context, true);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Order marked as Delivered!',
+                          style: GoogleFonts.inter(color: Colors.white),
+                        ),
+                        backgroundColor: kAccent,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error updating order: $e')),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: kAccent,
@@ -748,10 +847,76 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
               ?trailing,
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           child,
         ],
       ),
+    );
+  }
+
+  void _showDeleteConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+          title: Text(
+            'Delete Order',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimary),
+          ),
+          content: Text(
+            'Are you sure you want to delete this order? This action cannot be undone.',
+            style: GoogleFonts.inter(color: kTextPri),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(color: kTextSec, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext); // Close dialog
+                try {
+                  await OrderController().deleteOrder(_currentOrder.id);
+                  if (mounted) {
+                    Navigator.pop(context, true); // Go back to dashboard/orders
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Order deleted successfully!',
+                          style: GoogleFonts.inter(color: Colors.white),
+                        ),
+                        backgroundColor: Colors.red.shade600,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error deleting order: $e')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade600,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text(
+                'Delete',
+                style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'controllers/profile_controller.dart';
 import 'tailor_icon.dart';
+
+import 'models/order_model.dart';
+import 'models/customer_model.dart';
 
 // Assuming these are defined in your main.dart or a constants file
 const Color kPrimaryColor = Color(0xFF1E3A5F);
@@ -9,10 +14,20 @@ const Color kTextPrimary = Color(0xFF334155);
 const Color kTextSecondary = Color(0xFF64748B);
 
 class ReceiptWidget extends StatelessWidget {
-  const ReceiptWidget({super.key});
+  final OrderModel order;
+  final CustomerModel customer;
+
+  const ReceiptWidget({
+    super.key,
+    required this.order,
+    required this.customer,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final double remaining = order.totalAmount - order.advancePaid;
+    final bool isPaid = remaining <= 0;
+    
     return Container(
       color: Colors.white,
       width: 450, // Fixed width for generated receipt
@@ -40,7 +55,7 @@ class ReceiptWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Irfan Tailors',
+                  ProfileController().profile?.shopName ?? 'Tailor App',
                   style: GoogleFonts.inter(
                     color: Colors.white,
                     fontSize: 28,
@@ -76,10 +91,10 @@ class ReceiptWidget extends StatelessWidget {
           const SizedBox(height: 16),
 
           // 3. ORDER INFO SECTION
-          _buildInfoRow('Order ID:', '#ORD-001'),
-          _buildInfoRow('Date:', '12 June 2025'),
-          _buildInfoRow('Delivery Date:', '20 June 2025'),
-          _buildInfoRow('Status:', 'Ready ✓'),
+          _buildInfoRow('Order ID:', '#${order.id}'),
+          _buildInfoRow('Date:', DateFormat('dd MMM yyyy').format(order.orderDate)),
+          _buildInfoRow('Delivery Date:', DateFormat('dd MMM yyyy').format(order.deliveryDate)),
+          _buildInfoRow('Status:', order.status),
           const SizedBox(height: 12),
           _buildDashedDivider(),
           const SizedBox(height: 12),
@@ -87,9 +102,9 @@ class ReceiptWidget extends StatelessWidget {
           // 4. CUSTOMER INFO SECTION
           _buildSectionTitle('Customer Details'),
           const SizedBox(height: 8),
-          _buildInfoRow('Name:', 'Muhammad Ali'),
-          _buildInfoRow('Phone:', '0300-1234567'),
-          _buildInfoRow('Address:', 'Larkana, Sindh'),
+          _buildInfoRow('Name:', customer.name),
+          _buildInfoRow('Phone:', customer.phone),
+          _buildInfoRow('Address:', customer.address?.isNotEmpty == true ? customer.address! : 'N/A'),
           const SizedBox(height: 12),
           _buildDashedDivider(),
           const SizedBox(height: 12),
@@ -97,9 +112,9 @@ class ReceiptWidget extends StatelessWidget {
           // 5. ORDER DETAILS SECTION
           _buildSectionTitle('Order Details'),
           const SizedBox(height: 8),
-          _buildInfoRow('Order Type:', 'Adult'), // Or Child based on data
-          _buildInfoRow('Quantity:', '1'),
-          _buildInfoRow('Fabric Notes:', 'White lawn fabric'),
+          _buildInfoRow('Order Type:', order.isAdult ? 'Adult' : 'Child'),
+          _buildInfoRow('Quantity:', '${order.quantity}'),
+          _buildInfoRow('Fabric Notes:', order.measurements.extraNotes ?? 'N/A'),
           const SizedBox(height: 12),
           _buildDashedDivider(),
           const SizedBox(height: 12),
@@ -115,11 +130,11 @@ class ReceiptWidget extends StatelessWidget {
             ),
             child: Column(
               children: [
-                _buildPaymentRow('Total Amount:', 'PKR 5,000', Colors.white),
+                _buildPaymentRow('Total Amount:', 'PKR ${order.totalAmount.toStringAsFixed(0)}', Colors.white),
                 const SizedBox(height: 8),
-                _buildPaymentRow('Advance Paid:', 'PKR 2,000', kAccentColor),
+                _buildPaymentRow('Advance Paid:', 'PKR ${order.advancePaid.toStringAsFixed(0)}', kAccentColor),
                 const Divider(color: Colors.white24, height: 16),
-                _buildPaymentRow('Remaining:', 'PKR 3,000', kAccentColor),
+                _buildPaymentRow('Remaining:', 'PKR ${remaining.toStringAsFixed(0)}', kAccentColor),
               ],
             ),
           ),
@@ -129,14 +144,14 @@ class ReceiptWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: kAccentColor.withValues(alpha: 0.1),
-              border: Border.all(color: kAccentColor, width: 2),
+              color: (isPaid ? kAccentColor : Colors.orange).withValues(alpha: 0.1),
+              border: Border.all(color: isPaid ? kAccentColor : Colors.orange, width: 2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'PAID ✓',
+              isPaid ? 'PAID ✓' : 'UNPAID',
               style: GoogleFonts.inter(
-                color: kAccentColor,
+                color: isPaid ? kAccentColor : Colors.orange,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 2,
@@ -161,7 +176,13 @@ class ReceiptWidget extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Powered by Irfan Tailors App',
+            'Powered by TryUnity Solutions',
+            style: GoogleFonts.inter(color: kTextSecondary, fontSize: 10, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '+92 302 3476605',
             style: GoogleFonts.inter(color: kTextSecondary, fontSize: 10),
             textAlign: TextAlign.center,
           ),
@@ -245,25 +266,6 @@ class ReceiptWidget extends StatelessWidget {
       ],
     );
   }
-
-  Widget _buildChip(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: kTextSecondary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          color: kTextPrimary,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
   Widget _buildDashedDivider() {
     return const _DashedLine();
   }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import '../controllers/expense_controller.dart';
+import '../models/expense_model.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants (private to this file)
@@ -30,6 +32,7 @@ class _ECategory {
 // ─────────────────────────────────────────────────────────────────
 class EditExpenseScreen extends StatefulWidget {
   /// The expense being edited. All fields are pre-filled from this.
+  final String  expenseId;
   final String  expenseTitle;
   final double  expenseAmount;
   final String  expenseCategory; // e.g. "🏠 Rent"
@@ -38,6 +41,7 @@ class EditExpenseScreen extends StatefulWidget {
 
   const EditExpenseScreen({
     super.key,
+    required this.expenseId,
     required this.expenseTitle,
     required this.expenseAmount,
     required this.expenseCategory,
@@ -67,6 +71,8 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _amountCtrl;
   late final TextEditingController _notesCtrl;
+  
+  final ExpenseController _controller = ExpenseController();
 
   @override
   void initState() {
@@ -142,20 +148,34 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _SaveConfirmationSheet(
-        onConfirm: () {
+        onConfirm: () async {
           Navigator.pop(context); // close sheet
-          Navigator.pop(context); // close edit screen
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Expense updated successfully',
-                style: GoogleFonts.inter(color: Colors.white),
-              ),
-              backgroundColor: _kAccent,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+          
+          final categoryName = _categories[_selectedCategoryIndex!].name;
+          final updatedExpense = ExpenseModel(
+            id: widget.expenseId,
+            title: _titleCtrl.text.trim(),
+            category: categoryName,
+            amount: _parsedAmount,
+            date: _selectedDate,
+            notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           );
+          await _controller.updateExpense(updatedExpense);
+          
+          if (mounted) {
+            Navigator.pop(context, true); // close edit screen
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Expense updated successfully',
+                  style: GoogleFonts.inter(color: Colors.white),
+                ),
+                backgroundColor: _kAccent,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            );
+          }
         },
         onCancel: () => Navigator.pop(context),
       ),
