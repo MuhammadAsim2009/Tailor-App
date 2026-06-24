@@ -39,8 +39,8 @@ class OrderController extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Intentionally left empty. This is a singleton and should never be disposed.
-    // This completely prevents the "A OrderController was used after being disposed" error.
+    // Intentionally left empty to prevent singleton disposal
+    super.dispose();
   }
 
   /// Returns the customer name for a given order's customerId.
@@ -73,7 +73,7 @@ class OrderController extends ChangeNotifier {
   String get nextCustomerId => generateNextId(customers.map((c) => c.id));
   String get nextOrderId => generateNextId(orders.map((o) => o.id));
 
-  Future<void> addOrder({
+  Future<String> addOrder({
     required OrderModel order,
     required CustomerModel customer,
   }) async {
@@ -85,6 +85,7 @@ class OrderController extends ChangeNotifier {
               phone: customer.phone,
               address: customer.address,
               measurements: order.measurements,
+              updatedAt: DateTime.now(),
             )
           : CustomerModel(
               id: customer.id,
@@ -92,6 +93,7 @@ class OrderController extends ChangeNotifier {
               phone: customer.phone,
               address: customer.address,
               measurements: order.measurements,
+              updatedAt: DateTime.now(),
             );
 
       await _dbService.insertCustomer(customerToSave);
@@ -107,6 +109,7 @@ class OrderController extends ChangeNotifier {
         advancePaid: order.advancePaid,
         measurements: order.measurements,
         status: order.status,
+        updatedAt: DateTime.now(),
       );
 
       await _dbService.insertOrder(orderToSave);
@@ -117,6 +120,7 @@ class OrderController extends ChangeNotifier {
       }
 
       await loadData();
+      return orderToSave.id;
     } catch (e) {
       if (kDebugMode) {
         print('Error adding order: $e');
@@ -151,7 +155,8 @@ class OrderController extends ChangeNotifier {
 
   Future<void> updateOrder(OrderModel order) async {
     try {
-      await _dbService.updateOrder(order);
+      final orderToSave = order.copyWith(updatedAt: DateTime.now());
+      await _dbService.updateOrder(orderToSave);
 
       final customer = getCustomerById(order.customerId);
       if (customer != null) {
@@ -160,7 +165,8 @@ class OrderController extends ChangeNotifier {
           name: customer.name,
           phone: customer.phone,
           address: customer.address,
-          measurements: order.measurements,
+          measurements: orderToSave.measurements,
+          updatedAt: DateTime.now(),
         );
         await _dbService.insertCustomer(updatedCustomer);
       }
@@ -188,7 +194,8 @@ class OrderController extends ChangeNotifier {
 
   Future<void> updateCustomer(CustomerModel customer) async {
     try {
-      await _dbService.updateCustomer(customer);
+      final customerToSave = customer.copyWith(updatedAt: DateTime.now());
+      await _dbService.updateCustomer(customerToSave);
       await loadData();
     } catch (e) {
       if (kDebugMode) {

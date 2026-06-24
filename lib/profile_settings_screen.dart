@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'tailor_icon.dart';
 import 'controllers/profile_controller.dart';
 import 'models/profile_model.dart';
 import 'services/backup_export_service.dart';
+import 'login_screen.dart';
 import 'controllers/order_controller.dart';
 import 'controllers/expense_controller.dart';
+import 'services/firebase_sync_service.dart';
 const Color kPrimaryColor = Color(0xFF1E3A5F);
 const Color kAccentColor = Color(0xFF10B981);
 const Color kBackgroundColor = Color(0xFFF8FAFC);
@@ -120,9 +123,14 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(context);
-                    // Add logout logic here
+                    final nav = Navigator.of(context);
+                    await FirebaseAuth.instance.signOut();
+                    nav.pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
                   },
                   child: Text(
                     'Logout',
@@ -262,46 +270,176 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
   }
 
   void _showExportSheet() {
+    String selectedFilter = 'All';
+    DateTime? customStartDate;
+    DateTime? customEndDate;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Export Data',
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: kPrimaryColor,
-                  ),
-                  textAlign: TextAlign.center,
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Export Data',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: kPrimaryColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Select Date Range',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8.0,
+                      runSpacing: 8.0,
+                      children: ['All', 'Daily', 'Weekly', 'Monthly', 'Custom'].map((filter) {
+                        final isSelected = selectedFilter == filter;
+                        return ChoiceChip(
+                          label: Text(filter),
+                          selected: isSelected,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setModalState(() {
+                                selectedFilter = filter;
+                              });
+                            }
+                          },
+                          selectedColor: kAccentColor.withValues(alpha: 0.2),
+                          labelStyle: GoogleFonts.inter(
+                            color: isSelected ? kAccentColor : kTextSecondary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          backgroundColor: kBackgroundColor,
+                          side: BorderSide(
+                            color: isSelected ? kAccentColor : kTextSecondary.withValues(alpha: 0.2),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (selectedFilter == 'Custom') ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: customStartDate ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (date != null) {
+                                  setModalState(() {
+                                    customStartDate = date;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: kTextSecondary.withValues(alpha: 0.3)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  customStartDate != null
+                                      ? "${customStartDate!.day}/${customStartDate!.month}/${customStartDate!.year}"
+                                      : "Start Date",
+                                  style: GoogleFonts.inter(color: kTextPrimary),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: customEndDate ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (date != null) {
+                                  setModalState(() {
+                                    customEndDate = date;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: kTextSecondary.withValues(alpha: 0.3)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  customEndDate != null
+                                      ? "${customEndDate!.day}/${customEndDate!.month}/${customEndDate!.year}"
+                                      : "End Date",
+                                  style: GoogleFonts.inter(color: kTextPrimary),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    _buildExportOption(
+                      ctx,
+                      Icons.picture_as_pdf_outlined,
+                      'Export as PDF',
+                      Colors.red,
+                      'Generates a PDF document',
+                      () async {
+                        if (selectedFilter == 'Custom' && (customStartDate == null || customEndDate == null)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please select both start and end dates.')),
+                          );
+                          return;
+                        }
+                        Navigator.pop(ctx);
+                        await BackupExportService.exportToPDF(
+                          context,
+                          filterType: selectedFilter,
+                          customStartDate: customStartDate,
+                          customEndDate: customEndDate,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                _buildExportOption(
-                  ctx,
-                  Icons.picture_as_pdf_outlined,
-                  'Export as PDF',
-                  Colors.red,
-                  'Generates a PDF document',
-                  () async {
-                    Navigator.pop(ctx);
-                    await BackupExportService.exportToPDF(context);
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -537,6 +675,189 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
     );
   }
 
+  void _showToast(String message, {Color color = Colors.green}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: GoogleFonts.inter(color: Colors.white)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _showChangePasswordSheet() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isLoading = false;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Change Password',
+                      style: GoogleFonts.inter(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: kPrimaryColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    _buildPasswordField('Current Password', currentPasswordController, obscureCurrent, () {
+                      setModalState(() {
+                        obscureCurrent = !obscureCurrent;
+                      });
+                    }),
+                    const SizedBox(height: 16),
+                    _buildPasswordField('New Password', newPasswordController, obscureNew, () {
+                      setModalState(() {
+                        obscureNew = !obscureNew;
+                      });
+                    }),
+                    const SizedBox(height: 16),
+                    _buildPasswordField('Confirm Password', confirmPasswordController, obscureConfirm, () {
+                      setModalState(() {
+                        obscureConfirm = !obscureConfirm;
+                      });
+                    }),
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kAccentColor,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: isLoading ? null : () async {
+                        if (currentPasswordController.text.isEmpty ||
+                            newPasswordController.text.isEmpty ||
+                            confirmPasswordController.text.isEmpty) {
+                          _showToast('Please fill all fields.', color: Colors.red);
+                          return;
+                        }
+                        if (newPasswordController.text != confirmPasswordController.text) {
+                          _showToast('New passwords do not match.', color: Colors.red);
+                          return;
+                        }
+                        
+                        setModalState(() {
+                          isLoading = true;
+                        });
+
+                        try {
+                          final user = FirebaseAuth.instance.currentUser;
+                          if (user != null && user.email != null) {
+                            final cred = EmailAuthProvider.credential(
+                              email: user.email!,
+                              password: currentPasswordController.text,
+                            );
+                            await user.reauthenticateWithCredential(cred);
+                            await user.updatePassword(newPasswordController.text);
+                            
+                            if (ctx.mounted) {
+                              Navigator.pop(ctx);
+                              _showToast('Password updated successfully!', color: Colors.green);
+                            }
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          _showToast(e.message ?? 'Failed to update password.', color: Colors.red);
+                        } catch (e) {
+                          _showToast('An error occurred.', color: Colors.red);
+                        } finally {
+                          if (mounted) {
+                            setModalState(() {
+                              isLoading = false;
+                            });
+                          }
+                        }
+                      },
+                      child: isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              'Update Password',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPasswordField(String label, TextEditingController controller, bool obscureText, VoidCallback onToggle) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.inter(color: kTextSecondary),
+        suffixIcon: IconButton(
+          icon: Icon(
+            obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: kTextSecondary,
+          ),
+          onPressed: onToggle,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: kTextSecondary.withValues(alpha: 0.3)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: kTextSecondary.withValues(alpha: 0.3)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: kPrimaryColor),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+      style: GoogleFonts.inter(color: kTextPrimary),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SlideTransition(
@@ -594,7 +915,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                     child: _buildStatCard(
                       Icons.account_balance_wallet_outlined,
                       'Revenue',
-                      '${_orderController.orders.fold<double>(0, (sum, o) => sum + (o.status == 'Delivered' ? o.totalAmount : o.advancePaid)) - _expenseController.expenses.fold<double>(0, (sum, e) => sum + e.amount)}',
+                      '${_orderController.orders.fold<double>(0, (sum, o) => sum + o.advancePaid) - _expenseController.expenses.fold<double>(0, (sum, e) => sum + e.amount)}',
                       Colors.purple,
                     ),
                   ),
@@ -614,8 +935,23 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                 _buildSettingsItem(
                   icon: Icons.file_upload_outlined,
                   label: 'Export Data',
-                  subtitle: 'Export as Excel or PDF',
+                  subtitle: 'Export as PDF',
                   onTap: _showExportSheet,
+                ),
+                _buildSettingsItem(
+                  icon: Icons.sync,
+                  label: 'Sync Data',
+                  subtitle: 'Sync with Cloud (Two-Way)',
+                  onTap: () async {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Starting Sync...')),
+                    );
+                    await FirebaseSyncService.instance.performTwoWaySync();
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Sync Complete!')),
+                    );
+                  },
                   showDivider: false,
                 ),
               ]),
@@ -642,6 +978,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
               _buildSectionTitle('Account'),
               _buildSettingsCard([
                 _buildSettingsItem(
+                  icon: Icons.lock_outline,
+                  label: 'Change Password',
+                  subtitle: 'Update your account password',
+                  onTap: _showChangePasswordSheet,
+                ),
+                _buildSettingsItem(
                   icon: Icons.logout_outlined,
                   label: 'Logout',
                   iconColor: const Color(0xFFEF4444),
@@ -651,7 +993,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen>
                   showDivider: false,
                 ),
               ]),
-              const SizedBox(height: 48), // Bottom padding
+              const SizedBox(height: 24),
+
+              const SizedBox(height: 48),
             ],
           ),
         ),

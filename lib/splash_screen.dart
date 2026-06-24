@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
+import 'dashboard_screen.dart';
 import 'tailor_icon.dart';
 import 'controllers/profile_controller.dart';
+import 'services/firebase_sync_service.dart';
 
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
@@ -80,21 +83,27 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _animationController.forward();
 
-    // Navigate to LoginScreen after 3.5 seconds
+    // Navigate after animation completes
     Future.delayed(const Duration(milliseconds: 3500), () {
       if (mounted) {
-        // Restore system UI overlays before navigating
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-        
+
+        // If the user is already signed in, go directly to Dashboard
+        final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+        final destination =
+            isLoggedIn ? const DashboardScreen() : const LoginScreen();
+
+        // Only sync after confirming the user is authenticated
+        if (isLoggedIn) {
+          FirebaseSyncService.instance.performTwoWaySync();
+        }
+
         Navigator.of(context).pushReplacement(
           PageRouteBuilder(
             transitionDuration: const Duration(milliseconds: 800),
-            pageBuilder: (context, animation, secondaryAnimation) => const LoginScreen(),
+            pageBuilder: (context, animation, secondaryAnimation) => destination,
             transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
-              );
+              return FadeTransition(opacity: animation, child: child);
             },
           ),
         );
@@ -125,10 +134,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   animation: _logoDrawAnimation,
                   builder: (context, child) {
                     return CustomPaint(
-                      size: const Size(120, 120),
+                      size: const Size(180, 180),
                       painter: TailorLineArtPainter(
-                        primaryColor: kTextWhite,
-                        accentColor: kAccentColor,
+                        primaryColor: const Color(0xFFD4AF37), // Golden color for IF
+                        accentColor: kTextWhite,
                         progress: _logoDrawAnimation.value,
                       ),
                     );

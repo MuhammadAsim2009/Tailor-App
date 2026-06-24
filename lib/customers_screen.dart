@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../models/customer_model.dart';
 import '../models/order_model.dart';
 import '../controllers/order_controller.dart';
+import '../services/whatsapp_service.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
@@ -51,11 +52,8 @@ class _CustomersScreenState extends State<CustomersScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (_) => CustomerProfileScreen(
-              customer: customer,
-              controller: _controller,
-            ),
+        builder: (_) =>
+            CustomerProfileScreen(customer: customer, controller: _controller),
       ),
     ).then((_) => _controller.loadData());
   }
@@ -98,19 +96,17 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ),
               const SizedBox(height: 16),
               Expanded(
-                child:
-                    _controller.isLoading
-                        ? const Center(child: CircularProgressIndicator())
-                        : customers.isEmpty
-                        ? _buildEmptyState()
-                        : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: customers.length,
-                          itemBuilder:
-                              (context, index) =>
-                                  _buildCustomerCard(customers[index]),
-                        ),
+                child: _controller.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : customers.isEmpty
+                    ? _buildEmptyState()
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: customers.length,
+                        itemBuilder: (context, index) =>
+                            _buildCustomerCard(customers[index]),
+                      ),
               ),
             ],
           ),
@@ -140,20 +136,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
           hintText: 'Search customers...',
           hintStyle: GoogleFonts.inter(color: kTextSecondary),
           prefixIcon: const Icon(Icons.search_outlined, color: kTextSecondary),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                    icon: const Icon(
-                      Icons.close_outlined,
-                      color: kTextSecondary,
-                      size: 20,
-                    ),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                    },
-                  )
-                  : null,
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.close_outlined,
+                    color: kTextSecondary,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                )
+              : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(kRadius),
             borderSide: BorderSide.none,
@@ -166,16 +161,12 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Widget _buildCustomerCard(CustomerModel customer) {
     // Count this customer's orders
-    final orderCount =
-        _controller.orders
-            .where((o) => o.customerId == customer.id)
-            .length;
-    final pendingDues =
-        _controller.orders
-            .where(
-              (o) => o.customerId == customer.id && o.status != 'Delivered',
-            )
-            .fold<double>(0, (sum, o) => sum + (o.totalAmount - o.advancePaid));
+    final orderCount = _controller.orders
+        .where((o) => o.customerId == customer.id)
+        .length;
+    final pendingDues = _controller.orders
+        .where((o) => o.customerId == customer.id)
+        .fold<double>(0, (sum, o) => sum + (o.totalAmount - o.advancePaid));
 
     return Dismissible(
       key: Key(customer.id),
@@ -214,7 +205,10 @@ class _CustomersScreenState extends State<CustomersScreen> {
           _controller.deleteCustomer(customer.id);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Customer deleted', style: GoogleFonts.inter(color: Colors.white)),
+              content: Text(
+                'Customer deleted',
+                style: GoogleFonts.inter(color: Colors.white),
+              ),
               backgroundColor: Colors.red,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
@@ -227,201 +221,225 @@ class _CustomersScreenState extends State<CustomersScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-        color: kCardColor,
-        borderRadius: BorderRadius.circular(kRadius),
-        boxShadow: [
-          BoxShadow(
-            color: kTextPrimary.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+          color: kCardColor,
           borderRadius: BorderRadius.circular(kRadius),
-          onTap: () => _navigateToProfile(customer),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: kAccentColor.withValues(alpha: 0.15),
-                  child: Text(
-                    customer.initials,
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: kAccentColor,
+          boxShadow: [
+            BoxShadow(
+              color: kTextPrimary.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(kRadius),
+            onTap: () => _navigateToProfile(customer),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: kAccentColor.withValues(alpha: 0.15),
+                    child: Text(
+                      customer.initials,
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: kAccentColor,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: 8,
-                        children: [
-                          Text(
-                            customer.name,
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: kTextPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: kPrimaryColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '#${customer.id.length > 6 ? customer.id.substring(0, 6).toUpperCase() : customer.id.toUpperCase()}',
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          children: [
+                            Text(
+                              customer.name,
                               style: GoogleFonts.inter(
-                                fontSize: 10,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: kPrimaryColor,
+                                color: kTextPrimary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: kPrimaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '#${customer.id.length > 6 ? customer.id.substring(0, 6).toUpperCase() : customer.id.toUpperCase()}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: kPrimaryColor,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.phone_outlined,
-                            size: 14,
-                            color: kTextSecondary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            customer.phone,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.phone_outlined,
+                              size: 14,
                               color: kTextSecondary,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Text(
+                              customer.phone,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Stats
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$orderCount Orders',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: kTextSecondary,
+                        ),
                       ),
+                      const SizedBox(height: 6),
+                      pendingDues > 0
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Rs ${pendingDues.toStringAsFixed(0)} Due',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.red.shade700,
+                                ),
+                              ),
+                            )
+                          : Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Cleared',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.green.shade700,
+                                ),
+                              ),
+                            ),
                     ],
                   ),
-                ),
-                // Stats
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '$orderCount Orders',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: kTextSecondary,
-                      ),
+                  if (pendingDues > 0 && customer.phone.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline, color: kAccentColor),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () async {
+                        bool success = await WhatsAppService.sendGeneralPaymentReminder(
+                          phoneNumber: customer.phone,
+                          customerName: customer.name,
+                          totalPendingAmount: pendingDues,
+                        );
+                        if (!success && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Could not open WhatsApp. Is it installed?'),
+                              backgroundColor: Colors.red.shade600,
+                            ),
+                          );
+                        }
+                      },
                     ),
-                    const SizedBox(height: 6),
-                    pendingDues > 0
-                        ? Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Rs ${pendingDues.toStringAsFixed(0)} Due',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.red.shade700,
-                            ),
-                          ),
-                        )
-                        : Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Cleared',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ),
                   ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
     );
   }
 
   Future<bool> _showDeleteConfirmation(CustomerModel customer) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            'Delete Customer',
-            style: GoogleFonts.inter(
-              fontWeight: FontWeight.bold,
-              color: kPrimaryColor,
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to delete ${customer.name}? This will also delete all of their orders.',
-            style: GoogleFonts.inter(color: kTextPrimary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.inter(color: kTextSecondary),
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+              title: Text(
+                'Delete Customer',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  color: kPrimaryColor,
                 ),
               ),
-              child: Text(
-                'Delete',
-                style: GoogleFonts.inter(color: Colors.white),
+              content: Text(
+                'Are you sure you want to delete ${customer.name}? This will also delete all of their orders.',
+                style: GoogleFonts.inter(color: kTextPrimary),
               ),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.inter(color: kTextSecondary),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    'Delete',
+                    style: GoogleFonts.inter(color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   void _showEditCustomerSheet(CustomerModel customer) {
@@ -443,7 +461,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.person_search_outlined, size: 72, color: Colors.grey.shade300),
+          Icon(
+            Icons.person_search_outlined,
+            size: 72,
+            color: Colors.grey.shade300,
+          ),
           const SizedBox(height: 16),
           Text(
             'No customers yet',
@@ -480,13 +502,13 @@ class CustomerProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final customerOrders =
-        controller.orders
-            .where((o) => o.customerId == customer.id)
-            .toList();
-    final pendingDues = customerOrders
-        .where((o) => o.status != 'Delivered')
-        .fold<double>(0, (sum, o) => sum + (o.totalAmount - o.advancePaid));
+    final customerOrders = controller.orders
+        .where((o) => o.customerId == customer.id)
+        .toList();
+    final pendingDues = customerOrders.fold<double>(
+      0,
+      (sum, o) => sum + (o.totalAmount - o.advancePaid),
+    );
     final m = customer.measurements;
 
     return Scaffold(
@@ -602,25 +624,101 @@ class CustomerProfileScreen extends StatelessWidget {
   }
 
   Widget _buildMeasurementsCard(dynamic m) {
-    final rows = <MapEntry<String, String>>[];
+    final rows = <Widget>[];
 
-    void addRow(String label, String? value, {String suffix = '"'}) {
-      if (value != null && value.isNotEmpty) {
-        rows.add(MapEntry(label, '$value$suffix'));
+    void addRow(String label, String? measure, [List<String> options = const []]) {
+      if ((measure != null && measure.isNotEmpty) || options.isNotEmpty) {
+        rows.add(Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(label, style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary)),
+              ),
+              if (options.isNotEmpty)
+                Expanded(
+                  flex: 4,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: options.map((opt) => Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: kAccentColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kAccentColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Text(opt, style: GoogleFonts.inter(fontSize: 11, color: kAccentColor, fontWeight: FontWeight.w600)),
+                    )).toList(),
+                  ),
+                )
+              else
+                const Spacer(flex: 4),
+              if (measure != null && measure.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(measure, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPrimary)),
+              ],
+            ],
+          ),
+        ));
+        rows.add(Divider(color: Colors.grey.shade200, height: 1));
       }
     }
 
     addRow('Length', m.lengthMeasure);
-    addRow('Arm', m.armMeasure, suffix: m.optMundo == true ? '" (Mundo)' : '"');
+    addRow('Arm', m.armMeasure, [
+      if (m.optMundo || (m.mundoMeasure != null && m.mundoMeasure!.isNotEmpty))
+        'Mundo${m.mundoMeasure != null && m.mundoMeasure!.isNotEmpty ? ": ${m.mundoMeasure}" : ""}'
+    ]);
     addRow('Shoulder', m.shoulderMeasure);
-    addRow('Collar', m.collarMeasure);
+    addRow('Collar', m.collarMeasure, [
+      if (m.colRegular) 'Regular',
+      if (m.colFrench) 'French',
+      if (m.colSherwani) 'Sherwani (${m.sherwaniType})',
+    ]);
     addRow('Chest', m.chestMeasure);
     addRow('Waist', m.waistMeasure);
     addRow('Hip', m.hipMeasure);
-    addRow('Shalwar', m.shalwarMeasure);
+    addRow('Shalwar', m.shalwarMeasure, [
+      if (m.shalKanto) 'Kanto',
+      if (m.shalZipPocket) 'Zip Pocket',
+      if (m.shalWidth) 'Width',
+    ]);
     addRow('Bottom', m.bottomMeasure);
     addRow('Plate', m.plateMeasure);
-    if (m.cuffType?.isNotEmpty == true) rows.add(MapEntry('Cuff', m.cuffType));
+    addRow('Front Pocket', m.frontPocketMeasure, [if (m.optFrontPocket) 'Front Pocket']);
+    if (m.optSidePocket) {
+      addRow('Side Pocket', null, ['Side Pocket']);
+    }
+    if ((m.cuffType.toString().isNotEmpty && m.cuffType != 'None') || (m.cuffMeasure != null && m.cuffMeasure!.isNotEmpty)) {
+      List<String> options = [];
+      if (m.cuffType.toString().isNotEmpty && m.cuffType != 'None') {
+        options.add(m.cuffType.toString());
+      }
+      addRow('Cuff', m.cuffMeasure, options);
+    }
+    if (m.extraNotes != null && m.extraNotes.toString().isNotEmpty) {
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Extra', style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary)),
+              const SizedBox(height: 6),
+              Text(m.extraNotes.toString(), style: GoogleFonts.inter(fontSize: 14, color: kTextPrimary, height: 1.5)),
+            ],
+          ),
+        ),
+      );
+      rows.add(Divider(color: Colors.grey.shade200, height: 1));
+    }
+
+    if (rows.isNotEmpty) {
+      rows.removeLast(); // Remove last divider
+    }
 
     if (rows.isEmpty) {
       return _buildBaseCard(
@@ -633,33 +731,13 @@ class CustomerProfileScreen extends StatelessWidget {
 
     return _buildBaseCard(
       child: Column(
-        children: rows.asMap().entries.map((entry) {
-          return Column(
-            children: [
-              _buildMeasurementRow(entry.value.key, entry.value.value),
-              if (entry.key < rows.length - 1) const Divider(height: 16),
-            ],
-          );
-        }).toList(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: rows,
       ),
     );
   }
 
-  Widget _buildMeasurementRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: GoogleFonts.inter(color: kTextSecondary)),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontWeight: FontWeight.w600,
-            color: kTextPrimary,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   Widget _buildPaymentCard(BuildContext context, double pendingDues) {
     return _buildBaseCard(
@@ -780,7 +858,10 @@ class CustomerProfileScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _showRecordPaymentDialog(BuildContext context, double pendingDues) async {
+  Future<void> _showRecordPaymentDialog(
+    BuildContext context,
+    double pendingDues,
+  ) async {
     if (pendingDues <= 0) return;
 
     final TextEditingController amountCtrl = TextEditingController();
@@ -790,10 +871,15 @@ class CustomerProfileScreen extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Text(
             'Record Payment',
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimaryColor),
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              color: kPrimaryColor,
+            ),
           ),
           content: Form(
             key: formKey,
@@ -811,10 +897,14 @@ class CustomerProfileScreen extends StatelessWidget {
                   decoration: InputDecoration(
                     labelText: 'Amount Paid',
                     prefixIcon: const Icon(Icons.currency_rupee),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'Enter amount';
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Enter amount';
+                    }
                     final num = double.tryParse(val);
                     if (num == null || num <= 0) return 'Invalid amount';
                     if (num > pendingDues) return 'Cannot exceed pending dues';
@@ -827,7 +917,10 @@ class CustomerProfileScreen extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(color: kTextSecondary),
+              ),
             ),
             ElevatedButton(
               onPressed: () {
@@ -838,9 +931,14 @@ class CustomerProfileScreen extends StatelessWidget {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: kAccentColor,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-              child: Text('Save', style: GoogleFonts.inter(color: Colors.white)),
+              child: Text(
+                'Save',
+                style: GoogleFonts.inter(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -848,7 +946,11 @@ class CustomerProfileScreen extends StatelessWidget {
     ).then((amount) async {
       if (amount != null && amount is double) {
         final pendingOrders = controller.orders
-            .where((o) => o.customerId == customer.id && o.status != 'Delivered' && (o.totalAmount - o.advancePaid) > 0)
+            .where(
+              (o) =>
+                  o.customerId == customer.id &&
+                  (o.totalAmount - o.advancePaid) > 0,
+            )
             .toList();
         pendingOrders.sort((a, b) => a.orderDate.compareTo(b.orderDate));
 
@@ -857,11 +959,15 @@ class CustomerProfileScreen extends StatelessWidget {
           if (remainingPayment <= 0) break;
           double balance = o.totalAmount - o.advancePaid;
           if (remainingPayment >= balance) {
-            final updatedOrder = o.copyWith(advancePaid: o.advancePaid + balance);
+            final updatedOrder = o.copyWith(
+              advancePaid: o.advancePaid + balance,
+            );
             await controller.updateOrder(updatedOrder);
             remainingPayment -= balance;
           } else {
-            final updatedOrder = o.copyWith(advancePaid: o.advancePaid + remainingPayment);
+            final updatedOrder = o.copyWith(
+              advancePaid: o.advancePaid + remainingPayment,
+            );
             await controller.updateOrder(updatedOrder);
             remainingPayment = 0;
           }
@@ -870,10 +976,15 @@ class CustomerProfileScreen extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Payment recorded successfully!', style: GoogleFonts.inter(color: Colors.white)),
+              content: Text(
+                'Payment recorded successfully!',
+                style: GoogleFonts.inter(color: Colors.white),
+              ),
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
         }
@@ -886,10 +997,7 @@ class _EditCustomerSheet extends StatefulWidget {
   final CustomerModel customer;
   final ValueChanged<CustomerModel> onSave;
 
-  const _EditCustomerSheet({
-    required this.customer,
-    required this.onSave,
-  });
+  const _EditCustomerSheet({required this.customer, required this.onSave});
 
   @override
   State<_EditCustomerSheet> createState() => _EditCustomerSheetState();
@@ -1044,4 +1152,3 @@ class _EditCustomerSheetState extends State<_EditCustomerSheet> {
     );
   }
 }
-

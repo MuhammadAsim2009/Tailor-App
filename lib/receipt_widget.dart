@@ -64,11 +64,11 @@ class ReceiptWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '0300-1234567',
+                  ProfileController().profile?.phone ?? '0300-1234567',
                   style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                 ),
                 Text(
-                  'Main Market, Larkana',
+                  ProfileController().profile?.address ?? 'Main Market, Larkana',
                   style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                 ),
               ],
@@ -102,8 +102,9 @@ class ReceiptWidget extends StatelessWidget {
           // 4. CUSTOMER INFO SECTION
           _buildSectionTitle('Customer Details'),
           const SizedBox(height: 8),
+          _buildInfoRow('Customer ID:', customer.id),
           _buildInfoRow('Name:', customer.name),
-          _buildInfoRow('Phone:', customer.phone),
+          _buildInfoRow('Phone:', customer.phone.isNotEmpty ? customer.phone : 'N/A'),
           _buildInfoRow('Address:', customer.address?.isNotEmpty == true ? customer.address! : 'N/A'),
           const SizedBox(height: 12),
           _buildDashedDivider(),

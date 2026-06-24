@@ -4,6 +4,7 @@ class MeasurementModel {
   final String? lengthMeasure;
   final String? armMeasure;
   final bool optMundo;
+  final String? mundoMeasure;
   final String? shoulderMeasure;
   final String? collarMeasure;
   final bool colRegular;
@@ -23,12 +24,14 @@ class MeasurementModel {
   final String? frontPocketMeasure;
   final bool optSidePocket;
   final String cuffType;
+  final String? cuffMeasure;
   final String? extraNotes;
 
   MeasurementModel({
     this.lengthMeasure,
     this.armMeasure,
     this.optMundo = false,
+    this.mundoMeasure,
     this.shoulderMeasure,
     this.collarMeasure,
     this.colRegular = false,
@@ -48,6 +51,7 @@ class MeasurementModel {
     this.frontPocketMeasure,
     this.optSidePocket = false,
     this.cuffType = 'Round',
+    this.cuffMeasure,
     this.extraNotes,
   });
 
@@ -56,6 +60,7 @@ class MeasurementModel {
       'lengthMeasure': lengthMeasure,
       'armMeasure': armMeasure,
       'optMundo': optMundo,
+      'mundoMeasure': mundoMeasure,
       'shoulderMeasure': shoulderMeasure,
       'collarMeasure': collarMeasure,
       'colRegular': colRegular,
@@ -75,6 +80,7 @@ class MeasurementModel {
       'frontPocketMeasure': frontPocketMeasure,
       'optSidePocket': optSidePocket,
       'cuffType': cuffType,
+      'cuffMeasure': cuffMeasure,
       'extraNotes': extraNotes,
     };
   }
@@ -84,6 +90,7 @@ class MeasurementModel {
       lengthMeasure: map['lengthMeasure'],
       armMeasure: map['armMeasure'],
       optMundo: map['optMundo'] ?? false,
+      mundoMeasure: map['mundoMeasure'],
       shoulderMeasure: map['shoulderMeasure'],
       collarMeasure: map['collarMeasure'],
       colRegular: map['colRegular'] ?? false,
@@ -103,6 +110,7 @@ class MeasurementModel {
       frontPocketMeasure: map['frontPocketMeasure'],
       optSidePocket: map['optSidePocket'] ?? false,
       cuffType: map['cuffType'] ?? 'Round',
+      cuffMeasure: map['cuffMeasure'],
       extraNotes: map['extraNotes'],
     );
   }
@@ -112,6 +120,7 @@ class MeasurementModel {
   List<String> get designOptions {
     List<String> options = [];
     if (optMundo) options.add('Mundo');
+    if (mundoMeasure != null && mundoMeasure!.isNotEmpty) options.add('Mundo: $mundoMeasure');
     if (colRegular) options.add('Regular Collar');
     if (colFrench) options.add('French Collar');
     if (colSherwani) options.add('Sherwani Collar ($sherwaniType)');
@@ -120,7 +129,7 @@ class MeasurementModel {
     if (shalWidth) options.add('Shalwar Width');
     if (optFrontPocket) options.add('Front Pocket');
     if (optSidePocket) options.add('Side Pocket');
-    options.add('Cuff: $cuffType');
+    options.add('Cuff: $cuffType${cuffMeasure != null && cuffMeasure!.isNotEmpty ? " ($cuffMeasure)" : ""}');
     return options;
   }
 

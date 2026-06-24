@@ -43,15 +43,55 @@ class BackupExportService {
     }
   }
 
-  static Future<void> exportToPDF(BuildContext context) async {
+  static Future<void> exportToPDF(
+    BuildContext context, {
+    String filterType = 'All',
+    DateTime? customStartDate,
+    DateTime? customEndDate,
+  }) async {
     try {
       final dbPath = await getDatabasesPath();
       final path = join(dbPath, 'tailor_app.db');
       final db = await openDatabase(path);
 
-      final customers = await db.query('customers');
-      final orders = await db.query('orders');
-      final expenses = await db.query('expenses');
+      var customers = await db.query('customers');
+      var orders = await db.query('orders');
+      var expenses = await db.query('expenses');
+
+      bool isDateInRange(String? dateStr) {
+        if (filterType == 'All' || dateStr == null) return true;
+        
+        DateTime? date;
+        try {
+          date = DateTime.parse(dateStr);
+        } catch (_) {
+          return true; // If we can't parse, include it just in case
+        }
+
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        
+        if (filterType == 'Daily') {
+          return date.isAfter(today) || date.isAtSameMomentAs(today);
+        } else if (filterType == 'Weekly') {
+          final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
+          return date.isAfter(startOfWeek) || date.isAtSameMomentAs(startOfWeek);
+        } else if (filterType == 'Monthly') {
+          final startOfMonth = DateTime(today.year, today.month, 1);
+          return date.isAfter(startOfMonth) || date.isAtSameMomentAs(startOfMonth);
+        } else if (filterType == 'Custom') {
+          if (customStartDate != null && customEndDate != null) {
+            final start = DateTime(customStartDate.year, customStartDate.month, customStartDate.day);
+            final end = DateTime(customEndDate.year, customEndDate.month, customEndDate.day, 23, 59, 59);
+            return date.isAfter(start) && date.isBefore(end);
+          }
+        }
+        return true;
+      }
+
+      customers = customers.where((c) => isDateInRange(c['createdAt']?.toString())).toList();
+      orders = orders.where((o) => isDateInRange(o['orderDate']?.toString())).toList();
+      expenses = expenses.where((e) => isDateInRange(e['date']?.toString())).toList();
 
       final pdf = pw.Document();
 
@@ -126,7 +166,7 @@ class BackupExportService {
         directory = await getApplicationDocumentsDirectory();
       }
 
-      final file = File(join(directory!.path, 'tailor_app_export_${DateTime.now().millisecondsSinceEpoch}.pdf'));
+      final file = File(join(directory!.path, 'irfan_tailor_export_${DateTime.now().millisecondsSinceEpoch}.pdf'));
       await file.writeAsBytes(await pdf.save());
 
       if (!context.mounted) return;

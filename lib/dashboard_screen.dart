@@ -13,6 +13,7 @@ import '../controllers/order_controller.dart';
 import '../controllers/expense_controller.dart';
 import '../controllers/profile_controller.dart';
 import '../models/order_model.dart';
+import 'services/firebase_sync_service.dart';
 
 // --- Design System Constants ---
 const Color kPrimaryColor = Color(0xFF1E3A5F); // Deep Navy
@@ -22,7 +23,6 @@ const Color kCardColor = Color(0xFFFFFFFF);
 const Color kTextPrimary = Color(0xFF0F172A);
 const Color kTextSecondary = Color(0xFF64748B);
 const double kBorderRadius = 16.0;
-
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -49,6 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _orderController.addListener(_onStateChanged);
     _expenseController.addListener(_onStateChanged);
     _profileController.addListener(_onStateChanged);
+    FirebaseSyncService.instance.addListener(_onStateChanged);
   }
 
   @override
@@ -56,6 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _orderController.removeListener(_onStateChanged);
     _expenseController.removeListener(_onStateChanged);
     _profileController.removeListener(_onStateChanged);
+    FirebaseSyncService.instance.removeListener(_onStateChanged);
     super.dispose();
   }
 
@@ -141,22 +143,33 @@ class _DashboardScreenState extends State<DashboardScreen>
   // --- Main Content Structure ---
 
   Widget _buildContent() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 32),
-          _buildKPIGrid(),
-          const SizedBox(height: 32),
-          _buildQuickActions(),
-          const SizedBox(height: 32),
-          _buildOrderStatusFilter(),
-          const SizedBox(height: 16),
-          _buildRecentOrders(),
-        ],
+    return RefreshIndicator(
+      color: kAccentColor,
+      backgroundColor: kCardColor,
+      onRefresh: () async {
+        await FirebaseSyncService.instance.forcePullFromFirebase();
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 32),
+            _buildDailyRevenueCard(),
+            const SizedBox(height: 16),
+            _buildDailyExpenseCard(),
+            const SizedBox(height: 16),
+            _buildKPIGrid(),
+            const SizedBox(height: 32),
+            _buildQuickActions(),
+            const SizedBox(height: 32),
+            _buildOrderStatusFilter(),
+            const SizedBox(height: 16),
+            _buildRecentOrders(),
+          ],
+        ),
       ),
     );
   }
@@ -175,35 +188,43 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildHeader() {
+    final syncStatus = FirebaseSyncService.instance.status;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _getGreeting(),
-              style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _profileController.profile?.shopName ?? 'Tailor App',
-              style: GoogleFonts.inter(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: kPrimaryColor,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _getGreeting(),
+                style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              DateFormat('EEEE, d MMM').format(DateTime.now()),
-              style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                _profileController.profile?.shopName ?? 'Tailor App',
+                style: GoogleFonts.inter(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: kPrimaryColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                DateFormat('EEEE, d MMM').format(DateTime.now()),
+                style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
+              ),
+            ],
+          ),
         ),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Sync Status Badge
+            _SyncBadge(status: syncStatus),
+            const SizedBox(width: 8),
             Container(
               width: 48,
               height: 48,
@@ -228,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           const ProfileSettingsScreen(),
                       transitionsBuilder:
                           (context, animation, secondaryAnimation, child) {
-                            return child; // The screen has its own internal slide animation
+                            return child;
                           },
                     ),
                   );
@@ -241,12 +262,147 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  Widget _buildDailyRevenueCard() {
+    final now = DateTime.now();
+    bool isToday(DateTime date) => 
+        date.year == now.year && date.month == now.month && date.day == now.day;
+
+    final todayOrders = _orderController.orders.where((o) => isToday(o.orderDate)).toList();
+    final totalCollected = todayOrders.fold<double>(0, (sum, o) => sum + o.advancePaid);
+    final todayExpenses = _expenseController.expenses.where((e) => isToday(e.date)).toList();
+    final totalExpenses = todayExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final dailyRevenue = totalCollected - totalExpenses;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [kPrimaryColor, Color(0xFF2A5298)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(kBorderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimaryColor.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Today\'s Revenue',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Rs. ${dailyRevenue.toInt()}',
+            style: GoogleFonts.inter(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyExpenseCard() {
+    final now = DateTime.now();
+    bool isToday(DateTime date) => 
+        date.year == now.year && date.month == now.month && date.day == now.day;
+
+    final todayExpensesList = _expenseController.expenses.where((e) => isToday(e.date)).toList();
+    final todayTotalExpenses = todayExpensesList.fold<double>(0, (sum, e) => sum + e.amount);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kCardColor,
+        borderRadius: BorderRadius.circular(kBorderRadius),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.redAccent.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.money_off_csred_outlined, color: Colors.redAccent, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Today\'s Expenses',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  color: kTextSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Rs. ${todayTotalExpenses.toInt()}',
+            style: GoogleFonts.inter(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: kTextPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildKPIGrid() {
-    final orders = _orderController.orders;
-    final total = orders.length;
-    final pendingAmount = orders.fold<double>(0, (sum, o) => sum + (o.status == 'Delivered' ? 0 : (o.totalAmount - o.advancePaid)));
-    final completed = orders.where((o) => o.status == 'Delivered').length;
-    final revenue = orders.fold<double>(0, (sum, o) => sum + (o.status == 'Delivered' ? o.totalAmount : o.advancePaid));
+    final now = DateTime.now();
+    bool isToday(DateTime date) => 
+        date.year == now.year && date.month == now.month && date.day == now.day;
+    bool isThisMonth(DateTime date) => 
+        date.year == now.year && date.month == now.month;
+
+    final allOrders = _orderController.orders;
+    final todayOrders = allOrders.where((o) => isToday(o.orderDate)).toList();
+    
+    final total = todayOrders.length;
+    // Keep pending dues as overall since it's cumulative debt
+    final pendingAmount = allOrders.fold<double>(
+      0,
+      (sum, o) => sum + (o.totalAmount - o.advancePaid),
+    );
+    // Completed today
+    final completed = allOrders.where((o) => 
+        o.status == 'Delivered' && 
+        (o.updatedAt != null ? isToday(o.updatedAt!) : isToday(o.orderDate))
+    ).length;
+    
+    final monthOrders = allOrders.where((o) => isThisMonth(o.orderDate)).toList();
+    final monthCollected = monthOrders.fold<double>(0, (sum, o) => sum + o.advancePaid);
+    final monthExpenses = _expenseController.expenses.where((e) => isThisMonth(e.date)).toList();
+    final monthTotalExpenses = monthExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final monthRevenue = monthCollected - monthTotalExpenses;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -257,7 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       childAspectRatio: 1.4,
       children: [
         _buildKPICard(
-          title: 'Total Orders',
+          title: 'Today\'s Orders',
           value: total,
           icon: Icons.list_alt_outlined,
           bgColor: kPrimaryColor,
@@ -273,7 +429,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           isCurrency: true,
         ),
         _buildKPICard(
-          title: 'Completed',
+          title: 'Completed Today',
           value: completed,
           icon: Icons.check_circle_outline,
           bgColor: kCardColor,
@@ -281,8 +437,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           iconColor: kAccentColor,
         ),
         _buildKPICard(
-          title: 'Revenue',
-          value: revenue.toInt(),
+          title: 'Monthly Revenue',
+          value: monthRevenue.toInt(),
           icon: Icons.account_balance_wallet_outlined,
           bgColor: kCardColor,
           textColor: kTextPrimary,
@@ -505,8 +661,12 @@ class _DashboardScreenState extends State<DashboardScreen>
           )
         else
           ...orders.map((order) {
-            final customerName = _orderController.getCustomerName(order.customerId);
-            final deliveryFormatted = DateFormat('d MMM yyyy').format(order.deliveryDate);
+            final customerName = _orderController.getCustomerName(
+              order.customerId,
+            );
+            final deliveryFormatted = DateFormat(
+              'd MMM yyyy',
+            ).format(order.deliveryDate);
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
@@ -522,15 +682,15 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               child: ListTile(
                 onTap: () {
-                  final customer = _orderController.getCustomerById(order.customerId);
+                  final customer = _orderController.getCustomerById(
+                    order.customerId,
+                  );
                   if (customer != null) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => OrderDetailScreen(
-                          order: order,
-                          customer: customer,
-                        ),
+                        builder: (_) =>
+                            OrderDetailScreen(order: order, customer: customer),
                       ),
                     ).then((_) => _orderController.loadData());
                   }
@@ -1000,4 +1160,77 @@ class _NavItem {
     required this.outlineIcon,
     required this.filledIcon,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Firebase Sync Status Badge
+// ---------------------------------------------------------------------------
+class _SyncBadge extends StatelessWidget {
+  final SyncStatus status;
+  const _SyncBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color bg, Color fg, IconData icon, String label) = switch (status) {
+      SyncStatus.synced => (
+        const Color(0xFFDCFCE7),
+        const Color(0xFF16A34A),
+        Icons.cloud_done_outlined,
+        'Synced',
+      ),
+      SyncStatus.syncing => (
+        const Color(0xFFEFF6FF),
+        const Color(0xFF2563EB),
+        Icons.cloud_sync_outlined,
+        'Syncing…',
+      ),
+      SyncStatus.pending => (
+        const Color(0xFFFEF9C3),
+        const Color(0xFFCA8A04),
+        Icons.cloud_upload_outlined,
+        'Pending',
+      ),
+      SyncStatus.error => (
+        const Color(0xFFFEE2E2),
+        const Color(0xFFDC2626),
+        Icons.cloud_off_outlined,
+        'Failed',
+      ),
+    };
+
+    final bool isSyncing = status == SyncStatus.syncing;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          isSyncing
+              ? SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(fg),
+                  ),
+                )
+              : Icon(icon, color: fg, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

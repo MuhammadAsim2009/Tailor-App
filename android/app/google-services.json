@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "974359651834",
+    "project_id": "irfan-tailors",
+    "storage_bucket": "irfan-tailors.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:974359651834:android:45ad46ef44e32d2fc03043",
+        "android_client_info": {
+          "package_name": "com.example.tailor_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPgvwoq6EgNYBjbK9YEEK4yK_LzA0axPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

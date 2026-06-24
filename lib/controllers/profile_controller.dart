@@ -35,6 +35,7 @@ class ProfileController extends ChangeNotifier {
   @override
   void dispose() {
     // Intentionally left empty to prevent singleton disposal
+    super.dispose();
   }
 
   Future<void> updateProfile(ProfileModel updatedProfile) async {
@@ -42,8 +43,9 @@ class ProfileController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await DatabaseService.instance.updateProfile(updatedProfile.toMap());
-      _profile = updatedProfile;
+      final profileToSave = updatedProfile.copyWith(updatedAt: DateTime.now());
+      await DatabaseService.instance.updateProfile(profileToSave.toMap());
+      _profile = profileToSave;
     } catch (e) {
       debugPrint('Error updating profile: $e');
     } finally {

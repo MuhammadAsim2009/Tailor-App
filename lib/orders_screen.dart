@@ -6,6 +6,8 @@ import '../models/order_model.dart';
 import '../controllers/order_controller.dart';
 import 'order_detail_screen.dart';
 
+import '../services/whatsapp_service.dart';
+
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
 // ─────────────────────────────────────────────────────────────────
@@ -63,7 +65,26 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   void _markDelivered(OrderModel order) async {
+    final customer = _controller.getCustomerById(order.customerId);
+    if (customer != null && customer.phone.isNotEmpty) {
+      bool success = await WhatsAppService.sendOrderDeliveredMessage(
+        phoneNumber: customer.phone,
+        customerName: customer.name.isNotEmpty ? customer.name : 'Customer',
+        totalAmount: order.totalAmount,
+        advancePaid: order.advancePaid,
+      );
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Could not open WhatsApp. Is it installed?'),
+            backgroundColor: Colors.red.shade600,
+          ),
+        );
+      }
+    }
+
     await _controller.updateOrderStatus(order.id, 'Delivered');
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -89,6 +110,42 @@ class _OrdersScreenState extends State<OrdersScreen> {
             order: order,
             customerName: _controller.getCustomerName(order.customerId),
             onSave: (newStatus) async {
+              if (order.status != 'Ready' && newStatus == 'Ready') {
+                final customer = _controller.getCustomerById(order.customerId);
+                if (customer != null && customer.phone.isNotEmpty) {
+                  bool success = await WhatsAppService.sendOrderReadyMessage(
+                    phoneNumber: customer.phone,
+                    customerName: customer.name.isNotEmpty ? customer.name : 'Customer',
+                    orderId: order.id,
+                  );
+                  if (!success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Could not open WhatsApp. Is it installed?'),
+                        backgroundColor: Colors.orange.shade800,
+                      ),
+                    );
+                  }
+                }
+              } else if (order.status != 'Delivered' && newStatus == 'Delivered') {
+                final customer = _controller.getCustomerById(order.customerId);
+                if (customer != null && customer.phone.isNotEmpty) {
+                  bool success = await WhatsAppService.sendOrderDeliveredMessage(
+                    phoneNumber: customer.phone,
+                    customerName: customer.name.isNotEmpty ? customer.name : 'Customer',
+                    totalAmount: order.totalAmount,
+                    advancePaid: order.advancePaid,
+                  );
+                  if (!success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Could not open WhatsApp. Is it installed?'),
+                        backgroundColor: Colors.red.shade600,
+                      ),
+                    );
+                  }
+                }
+              }
               await _controller.updateOrderStatus(order.id, newStatus);
             },
           ),

@@ -265,7 +265,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     final double totalExpenses = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
     final double totalIncome = _orderController.orders
         .where((o) => o.orderDate.year == _currentMonth.year && o.orderDate.month == _currentMonth.month)
-        .fold(0.0, (sum, o) => sum + o.totalAmount);
+        .fold(0.0, (sum, o) => sum + o.advancePaid);
     final double netBalance = totalIncome - totalExpenses;
 
     return Container(
@@ -364,7 +364,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     final incomeByMonth = months.map((m) {
       final total = _orderController.orders
           .where((o) => o.orderDate.year == m.year && o.orderDate.month == m.month)
-          .fold(0.0, (sum, o) => sum + o.totalAmount) / 1000;
+          .fold(0.0, (sum, o) => sum + o.advancePaid) / 1000;
       if (total > maxY) maxY = total;
       return total;
     }).toList();

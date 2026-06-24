@@ -48,6 +48,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
   final bool _measurementsLocked = false;
   final _lengthCtrl = TextEditingController();
   final _armCtrl = TextEditingController();
+  final _mundoCtrl = TextEditingController();
   bool _optMundo = false;
   final _shoulderCtrl = TextEditingController();
   final _collarCtrl = TextEditingController();
@@ -68,6 +69,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
   final _frontPocketCtrl = TextEditingController();
   bool _optSidePocket = false;
   String _cuffType = 'Round'; // Round, Double kaj, Double, Square
+  final _cuffCtrl = TextEditingController();
   final _extraCtrl = TextEditingController();
 
   double get _totalAmount    => double.tryParse(_totalAmountCtrl.text) ?? 0;
@@ -112,6 +114,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       
       _lengthCtrl.text = m.lengthMeasure ?? '';
       _armCtrl.text = m.armMeasure ?? '';
+      _mundoCtrl.text = m.mundoMeasure ?? '';
       _optMundo = m.optMundo;
       _shoulderCtrl.text = m.shoulderMeasure ?? '';
       _collarCtrl.text = m.collarMeasure ?? '';
@@ -132,6 +135,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
       _frontPocketCtrl.text = m.frontPocketMeasure ?? '';
       _optSidePocket = m.optSidePocket;
       _cuffType = m.cuffType;
+      _cuffCtrl.text = m.cuffMeasure ?? '';
       _extraCtrl.text = m.extraNotes ?? '';
     } catch (e) {
       debugPrint('Error parsing measurements: $e');
@@ -149,6 +153,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     _advancePaidCtrl.dispose();
     _lengthCtrl.dispose();
     _armCtrl.dispose();
+    _mundoCtrl.dispose();
     _shoulderCtrl.dispose();
     _collarCtrl.dispose();
     _chestCtrl.dispose();
@@ -158,6 +163,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
     _bottomCtrl.dispose();
     _plateCtrl.dispose();
     _frontPocketCtrl.dispose();
+    _cuffCtrl.dispose();
     _extraCtrl.dispose();
     super.dispose();
   }
@@ -237,6 +243,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                       lengthMeasure: _lengthCtrl.text,
                       armMeasure: _armCtrl.text,
                       optMundo: _optMundo,
+                      mundoMeasure: _mundoCtrl.text,
                       shoulderMeasure: _shoulderCtrl.text,
                       collarMeasure: _collarCtrl.text,
                       colRegular: _colRegular,
@@ -256,6 +263,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                       frontPocketMeasure: _frontPocketCtrl.text,
                       optSidePocket: _optSidePocket,
                       cuffType: _cuffType,
+                      cuffMeasure: _cuffCtrl.text,
                       extraNotes: _extraCtrl.text,
                     );
 
@@ -696,7 +704,7 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                     Expanded(child: _buildCompactMeasureField('Arm', _armCtrl, readOnly: _measurementsLocked)),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _buildOptionCheckbox('Mundo', _optMundo, _measurementsLocked ? null : (v) => setState(() => _optMundo = v)),
+                      child: _buildCompactMeasureField('Mundo', _mundoCtrl, readOnly: _measurementsLocked),
                     ),
                   ],
                 ),
@@ -813,7 +821,9 @@ class _EditOrderScreenState extends State<EditOrderScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Cuff', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPri)),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
+                    _buildCompactMeasureField('', _cuffCtrl, readOnly: _measurementsLocked),
+                    const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
                       runSpacing: 0,

@@ -45,6 +45,7 @@ class ExpenseController extends ChangeNotifier {
       amount: amount,
       date: date,
       notes: notes,
+      updatedAt: DateTime.now(),
     );
 
     await _dbService.insertExpense(expense);
@@ -53,11 +54,14 @@ class ExpenseController extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Intentionally left empty to prevent singleton disposal
+    // We do NOT call removeListener inside dispose since the listener 
+    // itself references this controller, but we should call super.
+    super.dispose();
   }
 
   Future<void> updateExpense(ExpenseModel expense) async {
-    await _dbService.updateExpense(expense);
+    final updatedExpense = expense.copyWith(updatedAt: DateTime.now());
+    await _dbService.updateExpense(updatedExpense);
     await loadExpenses();
   }
 

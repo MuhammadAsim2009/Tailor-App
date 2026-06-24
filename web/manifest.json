@@ -1,6 +1,6 @@
 {
-    "name": "tailor_app",
-    "short_name": "tailor_app",
+    "name": "Irfan Tailors",
+    "short_name": "Irfan Tailors",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,10 +1,54 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:path_drawing/path_drawing.dart';
+import 'tailor_icon_paths.dart';
+
+class SvgPathData {
+  final Path path;
+  final Paint paint;
+
+  SvgPathData(this.path, this.paint);
+}
+
+class TailorIconCache {
+  static final TailorIconCache _instance = TailorIconCache._internal();
+  factory TailorIconCache() => _instance;
+  TailorIconCache._internal();
+
+  List<SvgPathData>? _parsedPaths;
+
+  List<SvgPathData> get paths {
+    if (_parsedPaths == null) {
+      _parsedPaths = [];
+      for (var p in logoPaths) {
+        Path parsedPath = parseSvgPathData(p.d);
+        if (p.dx != 0 || p.dy != 0) {
+          parsedPath = parsedPath.shift(Offset(p.dx, p.dy));
+        }
+
+        final Paint paint = Paint()
+          ..color = p.color
+          ..style = PaintingStyle.fill;
+          
+        _parsedPaths!.add(SvgPathData(parsedPath, paint));
+      }
+
+      // Sort paths from top-left to bottom-right so the sequential drawing looks natural
+      _parsedPaths!.sort((a, b) {
+        final centerA = a.path.getBounds().center;
+        final centerB = b.path.getBounds().center;
+        // Weight X and Y equally for a diagonal sweep
+        return (centerA.dx + centerA.dy).compareTo(centerB.dx + centerB.dy);
+      });
+    }
+    return _parsedPaths!;
+  }
+}
 
 class TailorLineArtPainter extends CustomPainter {
   final Color primaryColor;
   final Color accentColor;
-  final double progress; // 0.0 to 1.0 for drawing animation
+  final double progress;
 
   TailorLineArtPainter({
     required this.primaryColor,
@@ -14,78 +58,101 @@ class TailorLineArtPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()
-      ..color = primaryColor
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
+    final pathsData = TailorIconCache().paths;
+    if (pathsData.isEmpty) return;
 
-    final Paint accentPaint = Paint()
-      ..color = accentColor
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final double w = size.width;
-    final double h = size.height;
-
-    // Build the full paths
-    final Path hangerPath = Path();
-    hangerPath.moveTo(w * 0.5, h * 0.35);
-    hangerPath.cubicTo(w * 0.5, h * 0.2, w * 0.65, h * 0.2, w * 0.6, h * 0.1);
-    hangerPath.cubicTo(w * 0.55, h * 0.05, w * 0.45, h * 0.05, w * 0.45, h * 0.15);
-    hangerPath.cubicTo(w * 0.45, h * 0.25, w * 0.5, h * 0.3, w * 0.5, h * 0.35);
-    hangerPath.lineTo(w * 0.85, h * 0.6);
-    hangerPath.lineTo(w * 0.15, h * 0.6);
-    hangerPath.close();
-
-    final Path needlePath = Path();
-    needlePath.moveTo(w * 0.75, h * 0.8);
-    needlePath.lineTo(w * 0.9, h * 0.3);
-
-    final Path threadPath = Path();
-    threadPath.moveTo(w * 0.89, h * 0.35); // Through the eye
-    threadPath.quadraticBezierTo(w * 0.95, h * 0.5, w * 0.8, h * 0.6);
-    threadPath.quadraticBezierTo(w * 0.7, h * 0.7, w * 0.6, h * 0.75);
-    threadPath.quadraticBezierTo(w * 0.4, h * 0.85, w * 0.3, h * 0.75);
-    threadPath.quadraticBezierTo(w * 0.2, h * 0.65, w * 0.35, h * 0.6);
-
-    // Helper to draw a partial path based on progress
-    void drawPartialPath(Path path, Paint paint, double sectionProgress) {
-      if (sectionProgress <= 0) return;
-      if (sectionProgress >= 1.0) {
-        canvas.drawPath(path, paint);
-        return;
-      }
-
-      for (PathMetric pathMetric in path.computeMetrics()) {
-        Path extractPath = pathMetric.extractPath(
-          0.0,
-          pathMetric.length * sectionProgress,
-        );
-        canvas.drawPath(extractPath, paint);
+    Rect bounds = Rect.zero;
+    for (var pd in pathsData) {
+      if (bounds == Rect.zero) {
+        bounds = pd.path.getBounds();
+      } else {
+        bounds = bounds.expandToInclude(pd.path.getBounds());
       }
     }
 
-    // Sequence the animation: Hanger (0.0-0.5), Needle (0.5-0.7), Thread (0.7-1.0)
-    final double hangerProgress = (progress * 2).clamp(0.0, 1.0);
-    final double needleProgress = ((progress - 0.5) * 5).clamp(0.0, 1.0);
-    final double threadProgress = ((progress - 0.7) * 3.33).clamp(0.0, 1.0);
+    final double scaleX = size.width / bounds.width;
+    final double scaleY = size.height / bounds.height;
+    final double scale = scaleX < scaleY ? scaleX : scaleY;
 
-    drawPartialPath(hangerPath, paint, hangerProgress);
+    final double offsetX = (size.width - bounds.width * scale) / 2.0 - bounds.left * scale;
+    final double offsetY = (size.height - bounds.height * scale) / 2.0 - bounds.top * scale;
 
-    // Only draw needle eye if needle has started drawing
-    if (needleProgress > 0) {
-      // Animate needle eye opacity or draw it
-      canvas.drawOval(
-        Rect.fromCenter(center: Offset(w * 0.89, h * 0.35), width: w * 0.03, height: h * 0.08),
-        paint..strokeWidth = 1.5,
-      );
+    canvas.translate(offsetX, offsetY);
+    canvas.scale(scale);
+
+    // 0.0 to 0.7: Progressive outline drawing sequentially
+    // 0.7 to 1.0: Fading in the fills
+    double outlineProgress = (progress / 0.7).clamp(0.0, 1.0);
+    double fillOpacity = ((progress - 0.7) / 0.3).clamp(0.0, 1.0);
+
+    // Calculate total length of all paths
+    double totalLength = 0;
+    List<double> pathLengths = [];
+    List<List<PathMetric>> allMetrics = [];
+
+    for (var pd in pathsData) {
+      double pLength = 0;
+      List<PathMetric> metrics = pd.path.computeMetrics().toList();
+      for (var m in metrics) {
+        pLength += m.length;
+      }
+      pathLengths.add(pLength);
+      allMetrics.add(metrics);
+      totalLength += pLength;
     }
-    drawPartialPath(needlePath, paint, needleProgress);
 
-    drawPartialPath(threadPath, accentPaint, threadProgress);
+    double currentDistance = totalLength * outlineProgress;
+
+    for (int i = 0; i < pathsData.length; i++) {
+      var pd = pathsData[i];
+      var pLength = pathLengths[i];
+      var metrics = allMetrics[i];
+
+      // Draw outlines
+      if (currentDistance > 0 && outlineProgress > 0) {
+        if (currentDistance >= pLength) {
+          // Draw fully
+          Paint strokePaint = Paint()
+            ..color = primaryColor
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.5 / scale;
+          canvas.drawPath(pd.path, strokePaint);
+        } else {
+          // Draw partially
+          double remainingInPath = currentDistance;
+          for (var metric in metrics) {
+            if (remainingInPath <= 0) break;
+            if (remainingInPath >= metric.length) {
+              Path extractPath = metric.extractPath(0.0, metric.length);
+              Paint strokePaint = Paint()
+                ..color = primaryColor
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2.0 / scale;
+              canvas.drawPath(extractPath, strokePaint);
+              remainingInPath -= metric.length;
+            } else {
+              Path extractPath = metric.extractPath(0.0, remainingInPath);
+              Paint strokePaint = Paint()
+                ..color = primaryColor
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 2.5 / scale; // Slightly thicker at the drawing tip
+              canvas.drawPath(extractPath, strokePaint);
+              remainingInPath = 0;
+            }
+          }
+        }
+      }
+
+      currentDistance -= pLength;
+
+      // Draw fills
+      if (fillOpacity > 0.0) {
+        Paint fillPaint = Paint()
+          ..color = primaryColor.withValues(alpha: fillOpacity)
+          ..style = PaintingStyle.fill;
+        canvas.drawPath(pd.path, fillPaint);
+      }
+    }
   }
 
   @override
