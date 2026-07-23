@@ -167,6 +167,13 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final pendingDues = _controller.orders
         .where((o) => o.customerId == customer.id)
         .fold<double>(0, (sum, o) => sum + (o.totalAmount - o.advancePaid));
+    final totalQty = _controller.orders
+        .where((o) => o.customerId == customer.id)
+        .fold<int>(0, (sum, o) => sum + o.quantity);
+    final pickedQty = _controller.orders
+        .where((o) => o.customerId == customer.id)
+        .fold<int>(0, (sum, o) => sum + o.pickedUpQuantity);
+    final remainingQty = totalQty - pickedQty;
 
     return Dismissible(
       key: Key(customer.id),
@@ -308,6 +315,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
                             ),
                           ],
                         ),
+                        if (totalQty > 0) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _buildQtyBadge('$totalQty Total', kPrimaryColor.withValues(alpha: 0.1), kPrimaryColor),
+                              _buildQtyBadge('$pickedQty Picked', kAccentColor.withValues(alpha: 0.12), kAccentColor),
+                              if (remainingQty > 0)
+                                _buildQtyBadge('$remainingQty Left', Colors.orange.shade50, Colors.orange.shade700),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -485,6 +505,24 @@ class _CustomersScreenState extends State<CustomersScreen> {
       ),
     );
   }
+
+  Widget _buildQtyBadge(String label, Color bg, Color fg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: fg,
+        ),
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -509,6 +547,9 @@ class CustomerProfileScreen extends StatelessWidget {
       0,
       (sum, o) => sum + (o.totalAmount - o.advancePaid),
     );
+    final totalQty = customerOrders.fold<int>(0, (sum, o) => sum + o.quantity);
+    final pickedQty = customerOrders.fold<int>(0, (sum, o) => sum + o.pickedUpQuantity);
+    final remainingQty = totalQty - pickedQty;
     final m = customer.measurements;
 
     return Scaffold(
@@ -540,6 +581,12 @@ class CustomerProfileScreen extends StatelessWidget {
                     _buildSectionTitle('Saved Measurements'),
                     const SizedBox(height: 12),
                     _buildMeasurementsCard(m),
+                    const SizedBox(height: 24),
+                  ],
+                  if (totalQty > 0) ...[
+                    _buildSectionTitle('Pickup Summary'),
+                    const SizedBox(height: 12),
+                    _buildPickupSummaryCard(totalQty, pickedQty, remainingQty),
                     const SizedBox(height: 24),
                   ],
                   _buildSectionTitle('Payment Record'),
@@ -596,6 +643,22 @@ class CustomerProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '#${customer.id.length > 6 ? customer.id.substring(0, 6).toUpperCase() : customer.id.toUpperCase()}',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             customer.phone,
             style: GoogleFonts.inter(fontSize: 14, color: Colors.white70),
@@ -641,16 +704,11 @@ class CustomerProfileScreen extends StatelessWidget {
                   flex: 4,
                   child: Wrap(
                     alignment: WrapAlignment.end,
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: options.map((opt) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: kAccentColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: kAccentColor.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(opt, style: GoogleFonts.inter(fontSize: 11, color: kAccentColor, fontWeight: FontWeight.w600)),
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: options.map((opt) => Text(
+                      '($opt)',
+                      style: GoogleFonts.inter(fontSize: 16, color: kAccentColor, fontWeight: FontWeight.w500),
                     )).toList(),
                   ),
                 )
@@ -689,9 +747,7 @@ class CustomerProfileScreen extends StatelessWidget {
     addRow('Bottom', m.bottomMeasure);
     addRow('Plate', m.plateMeasure);
     addRow('Front Pocket', m.frontPocketMeasure, [if (m.optFrontPocket) 'Front Pocket']);
-    if (m.optSidePocket) {
-      addRow('Side Pocket', null, ['Side Pocket']);
-    }
+    addRow('Side Pocket', m.sidePocketMeasure, [if (m.optSidePocket) 'Side Pocket']);
     if ((m.cuffType.toString().isNotEmpty && m.cuffType != 'None') || (m.cuffMeasure != null && m.cuffMeasure!.isNotEmpty)) {
       List<String> options = [];
       if (m.cuffType.toString().isNotEmpty && m.cuffType != 'None') {
@@ -737,7 +793,78 @@ class CustomerProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildPickupSummaryCard(int total, int picked, int remaining) {
+    final progress = total > 0 ? picked / total : 0.0;
+    return _buildBaseCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildQtyStat('Total Qty', total, kPrimaryColor),
+              ),
+              Expanded(
+                child: _buildQtyStat('Picked Up', picked, kAccentColor),
+              ),
+              Expanded(
+                child: _buildQtyStat('Remaining', remaining,
+                    remaining > 0 ? Colors.orange.shade700 : kAccentColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$picked of $total items collected',
+                style: GoogleFonts.inter(fontSize: 12, color: kTextSecondary),
+              ),
+              Text(
+                '${(progress * 100).toStringAsFixed(0)}%',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: progress >= 1.0 ? kAccentColor : kPrimaryColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.grey.shade200,
+              color: progress >= 1.0 ? kAccentColor : Colors.orange.shade400,
+              minHeight: 8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
+  Widget _buildQtyStat(String label, int value, Color color) {
+    return Column(
+      children: [
+        Text(
+          '$value',
+          style: GoogleFonts.inter(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11, color: kTextSecondary),
+        ),
+      ],
+    );
+  }
 
   Widget _buildPaymentCard(BuildContext context, double pendingDues) {
     return _buildBaseCard(

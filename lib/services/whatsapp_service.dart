@@ -45,7 +45,7 @@ class WhatsAppService {
     required String orderId,
   }) async {
     final shopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
-    final message = "Hello $customerName! Your order is ready for pickup at $shopName. Thank you!";
+    final message = "Dear $customerName! Your order is ready for pickup at $shopName. Thank you!";
     return sendTextMessage(phoneNumber: phoneNumber, message: message);
   }
 
@@ -59,7 +59,7 @@ class WhatsAppService {
     final shopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
     final remainingAmount = totalAmount - advancePaid;
     
-    String message = "Hello $customerName! Your order has been delivered successfully from $shopName. Thank you for choosing us!";
+    String message = "Dear $customerName! Your order has been delivered successfully from $shopName. Thank you for choosing us!";
     
     if (remainingAmount > 0) {
       message += "\n\nPlease note that you have a pending balance of Rs. ${remainingAmount.toStringAsFixed(0)} for this order. Please clear it as soon as possible.";
@@ -76,7 +76,7 @@ class WhatsAppService {
     required double remainingAmount,
   }) async {
     final shopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
-    final message = "Hello $customerName! This is a reminder from $shopName. You have a remaining balance of Rs. ${remainingAmount.toStringAsFixed(0)}. Please clear the dues at your earliest convenience. Thank you!";
+    final message = "Dear $customerName! This is a reminder from $shopName. You have a remaining balance of Rs. ${remainingAmount.toStringAsFixed(0)}. Please clear the dues at your earliest convenience. Thank you!";
     return sendTextMessage(phoneNumber: phoneNumber, message: message);
   }
 
@@ -87,7 +87,7 @@ class WhatsAppService {
     required double totalPendingAmount,
   }) async {
     final shopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
-    final message = "Hello $customerName! This is a gentle reminder from $shopName. "
+    final message = "Dear $customerName! This is a gentle reminder from $shopName. "
         "You have a total pending balance of Rs. ${totalPendingAmount.toStringAsFixed(0)}. "
         "Please clear your dues at your earliest convenience. Thank you!";
     return sendTextMessage(phoneNumber: phoneNumber, message: message);
@@ -102,7 +102,7 @@ class WhatsAppService {
   }) {
     final remainingAmount = totalAmount - advancePaid;
     final shopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
-    return "Hello $customerName!\n"
+    return "Dear $customerName!\n"
         "Thank you for placing your order with $shopName.\n"
         "Total amount: Rs. ${totalAmount.toStringAsFixed(0)}\n"
         "Advance paid: Rs. ${advancePaid.toStringAsFixed(0)}\n"
@@ -138,13 +138,6 @@ class WhatsAppService {
     required double advancePaid,
   }) async {
     try {
-      final caption = buildNewOrderMessage(
-        customerName: customerName,
-        orderId: orderId,
-        totalAmount: totalAmount,
-        advancePaid: advancePaid,
-      );
-
       // Save bytes to a temp file
       final tempDir = await getTemporaryDirectory();
       final filePath = '${tempDir.path}/receipt_$orderId.png';
@@ -156,7 +149,6 @@ class WhatsAppService {
       final shareShopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
       final result = await Share.shareXFiles(
         [xFile],
-        text: caption,
         subject: 'Order Receipt - $shareShopName',
       );
 

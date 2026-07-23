@@ -12,6 +12,7 @@ import 'models/order_model.dart';
 import 'models/customer_model.dart';
 import 'controllers/order_controller.dart';
 import 'services/whatsapp_service.dart';
+import 'services/database_service.dart';
 
 // --- Design System Constants ---
 const Color kPrimary = Color(0xFF1E3A5F); // Deep Navy
@@ -252,6 +253,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             const SizedBox(height: 16),
             _buildOrderInfoCard(),
             const SizedBox(height: 16),
+            if (_currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered') ...[
+              _buildPickupTrackingCard(),
+              const SizedBox(height: 16),
+            ],
             _buildMeasurementsCard(),
             const SizedBox(height: 16),
             _buildTimelineCard(),
@@ -563,6 +568,165 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     );
   }
 
+  // 3b. PICKUP TRACKING CARD
+  Widget _buildPickupTrackingCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.circular(kR),
+        boxShadow: [
+          BoxShadow(
+            color: kTextPri.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Pickup Tracking',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: kPrimary,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kAccent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_currentOrder.pickedUpQuantity} / ${_currentOrder.quantity} Picked',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: kAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: _currentOrder.quantity > 0 ? _currentOrder.pickedUpQuantity / _currentOrder.quantity : 0,
+              backgroundColor: Colors.grey.shade200,
+              color: _currentOrder.pickedUpQuantity >= _currentOrder.quantity ? Colors.green : kAccent,
+              minHeight: 10,
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Add Pickup buttons
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Record Pickup:',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: kTextSec,
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildPickupButton(-1, Icons.remove, color: Colors.red.shade400),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Qty',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: kTextPri,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildPickupButton(1, Icons.add, color: kAccent),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPickupButton(int change, IconData icon, {required Color color}) {
+    final bool canAdd = change > 0 && _currentOrder.pickedUpQuantity < _currentOrder.quantity;
+    final bool canRemove = change < 0 && _currentOrder.pickedUpQuantity > 0;
+    final bool isEnabled = canAdd || canRemove;
+
+    return Material(
+      color: isEnabled ? color.withValues(alpha: 0.1) : Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: isEnabled ? () => _updatePickupQuantity(change) : null,
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: 20,
+            color: isEnabled ? color : Colors.grey.shade400,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _updatePickupQuantity(int change) async {
+    final newQuantity = _currentOrder.pickedUpQuantity + change;
+    
+    // Safety check
+    if (newQuantity < 0 || newQuantity > _currentOrder.quantity) return;
+    
+    try {
+      final updatedOrder = _currentOrder.copyWith(pickedUpQuantity: newQuantity);
+      
+      // We need to implement an update order method that just saves the current order state
+      // For now, if your controller doesn't have a direct save method for the whole order,
+      // we might need to add it, or we can use DatabaseService directly.
+      await DatabaseService.instance.database.then((db) async {
+        await db.update(
+          'orders',
+          {'pickedUpQuantity': newQuantity},
+          where: 'id = ?',
+          whereArgs: [_currentOrder.id],
+        );
+      });
+      
+      setState(() {
+        _currentOrder = updatedOrder;
+      });
+      
+      // Auto-mark as delivered if all items are picked up? Optional UX improvement.
+      // If the user wants to keep "Mark Delivered" manual, we skip it.
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating pickup: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -624,14 +788,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                     alignment: WrapAlignment.end,
                     spacing: 6,
                     runSpacing: 6,
-                    children: options.map((opt) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: kAccent.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: kAccent.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(opt, style: GoogleFonts.inter(fontSize: 11, color: kAccent, fontWeight: FontWeight.w600)),
+                    children: options.map((opt) => Text(
+                      '($opt)',
+                      style: GoogleFonts.inter(fontSize: 16, color: kAccent, fontWeight: FontWeight.w500),
                     )).toList(),
                   ),
                 )

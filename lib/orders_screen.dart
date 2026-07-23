@@ -7,6 +7,7 @@ import '../controllers/order_controller.dart';
 import 'order_detail_screen.dart';
 
 import '../services/whatsapp_service.dart';
+import '../services/database_service.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
@@ -149,6 +150,155 @@ class _OrdersScreenState extends State<OrdersScreen> {
               await _controller.updateOrderStatus(order.id, newStatus);
             },
           ),
+    );
+  }
+
+  Future<void> _updatePickupQuantity(OrderModel order, int change) async {
+    final newQuantity = order.pickedUpQuantity + change;
+    
+    // Safety check
+    if (newQuantity < 0 || newQuantity > order.quantity) return;
+    
+    try {
+      await DatabaseService.instance.database.then((db) async {
+        await db.update(
+          'orders',
+          {'pickedUpQuantity': newQuantity},
+          where: 'id = ?',
+          whereArgs: [order.id],
+        );
+      });
+      
+      // Update locally to avoid loading spinner flash
+      final index = _controller.orders.indexWhere((o) => o.id == order.id);
+      if (index != -1) {
+        _controller.orders[index] = order.copyWith(pickedUpQuantity: newQuantity);
+        // We call notifyListeners manually or just setState to rebuild the list
+        setState(() {}); 
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating pickup: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildCompactPickupTracking(OrderModel order) {
+    final bool canAdd = order.pickedUpQuantity < order.quantity;
+    final bool canRemove = order.pickedUpQuantity > 0;
+    final bool isComplete = order.pickedUpQuantity >= order.quantity;
+    
+    Widget buildStepperBtn(int change, IconData icon, Color color, bool isEnabled) {
+      return Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: isEnabled ? () => _updatePickupQuantity(order, change) : null,
+          child: Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            child: Icon(icon, size: 20, color: color),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isComplete ? kAccentColor.withValues(alpha: 0.04) : kPrimaryColor.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isComplete ? kAccentColor.withValues(alpha: 0.2) : kPrimaryColor.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Picked Up',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: kTextSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '${order.pickedUpQuantity}',
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isComplete ? kAccentColor : kPrimaryColor,
+                            ),
+                          ),
+                          Text(
+                            ' / ${order.quantity}',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: kTextSecondary,
+                            ),
+                          ),
+                          if (isComplete) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.check_circle, size: 14, color: kAccentColor),
+                          ]
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      )
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      buildStepperBtn(-1, Icons.remove, canRemove ? Colors.red.shade400 : Colors.grey.shade300, canRemove),
+                      Container(width: 1, height: 24, color: Colors.grey.shade100),
+                      buildStepperBtn(1, Icons.add, canAdd ? kAccentColor : Colors.grey.shade300, canAdd),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Super thin progress indicator at the bottom of the card
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(11)),
+            child: LinearProgressIndicator(
+              value: order.quantity > 0 ? order.pickedUpQuantity / order.quantity : 0,
+              backgroundColor: Colors.transparent,
+              color: isComplete ? kAccentColor : kPrimaryColor.withValues(alpha: 0.2),
+              minHeight: 3,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -523,6 +673,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                     ),
                   ],
                 ),
+                if (order.status == 'Ready' || order.status == 'Delivered') ...[
+                  const SizedBox(height: 12),
+                  _buildCompactPickupTracking(order),
+                ],
               ],
             ),
           ),

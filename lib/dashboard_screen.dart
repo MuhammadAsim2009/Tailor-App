@@ -150,16 +150,16 @@ class _DashboardScreenState extends State<DashboardScreen>
         await FirebaseSyncService.instance.forcePullFromFirebase();
       },
       child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(),
             const SizedBox(height: 32),
-            _buildDailyRevenueCard(),
-            const SizedBox(height: 16),
-            _buildDailyExpenseCard(),
+            _buildTodayIncomeCard(),
             const SizedBox(height: 16),
             _buildKPIGrid(),
             const SizedBox(height: 32),
@@ -262,16 +262,27 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildDailyRevenueCard() {
+  Widget _buildTodayIncomeCard() {
     final now = DateTime.now();
-    bool isToday(DateTime date) => 
+    bool isToday(DateTime date) =>
         date.year == now.year && date.month == now.month && date.day == now.day;
 
-    final todayOrders = _orderController.orders.where((o) => isToday(o.orderDate)).toList();
-    final totalCollected = todayOrders.fold<double>(0, (sum, o) => sum + o.advancePaid);
-    final todayExpenses = _expenseController.expenses.where((e) => isToday(e.date)).toList();
-    final totalExpenses = todayExpenses.fold<double>(0, (sum, e) => sum + e.amount);
-    final dailyRevenue = totalCollected - totalExpenses;
+    final todayOrders = _orderController.orders
+        .where((o) => isToday(o.orderDate))
+        .toList();
+    final totalCollected = todayOrders.fold<double>(
+      0,
+      (sum, o) => sum + o.advancePaid,
+    );
+    final todayExpenses = _expenseController.expenses
+        .where((e) => isToday(e.date))
+        .toList();
+    final totalExpenses = todayExpenses.fold<double>(
+      0,
+      (sum, e) => sum + e.amount,
+    );
+    final dailyRevenue =
+        totalCollected; // Changed from totalCollected - totalExpenses
 
     return Container(
       width: double.infinity,
@@ -296,10 +307,14 @@ class _DashboardScreenState extends State<DashboardScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 20),
+              Icon(
+                Icons.account_balance_wallet_outlined,
+                color: Colors.white70,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Text(
-                'Today\'s Revenue',
+                'Today\'s Income',
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   color: Colors.white70,
@@ -322,70 +337,29 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  Widget _buildDailyExpenseCard() {
-    final now = DateTime.now();
-    bool isToday(DateTime date) => 
-        date.year == now.year && date.month == now.month && date.day == now.day;
-
-    final todayExpensesList = _expenseController.expenses.where((e) => isToday(e.date)).toList();
-    final todayTotalExpenses = todayExpensesList.fold<double>(0, (sum, e) => sum + e.amount);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kCardColor,
-        borderRadius: BorderRadius.circular(kBorderRadius),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.redAccent.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.money_off_csred_outlined, color: Colors.redAccent, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Today\'s Expenses',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: kTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Rs. ${todayTotalExpenses.toInt()}',
-            style: GoogleFonts.inter(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: kTextPrimary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildKPIGrid() {
     final now = DateTime.now();
-    bool isToday(DateTime date) => 
+    bool isToday(DateTime date) =>
         date.year == now.year && date.month == now.month && date.day == now.day;
-    bool isThisMonth(DateTime date) => 
+    bool isThisMonth(DateTime date) =>
         date.year == now.year && date.month == now.month;
 
     final allOrders = _orderController.orders;
     final todayOrders = allOrders.where((o) => isToday(o.orderDate)).toList();
-    
+
+    final todayCollected = todayOrders.fold<double>(
+      0,
+      (sum, o) => sum + o.advancePaid,
+    );
+    final todayExpensesList = _expenseController.expenses
+        .where((e) => isToday(e.date))
+        .toList();
+    final todayTotalExpenses = todayExpensesList.fold<double>(
+      0,
+      (sum, e) => sum + e.amount,
+    );
+    final todayIncome = todayCollected - todayTotalExpenses;
+
     final total = todayOrders.length;
     // Keep pending dues as overall since it's cumulative debt
     final pendingAmount = allOrders.fold<double>(
@@ -393,15 +367,30 @@ class _DashboardScreenState extends State<DashboardScreen>
       (sum, o) => sum + (o.totalAmount - o.advancePaid),
     );
     // Completed today
-    final completed = allOrders.where((o) => 
-        o.status == 'Delivered' && 
-        (o.updatedAt != null ? isToday(o.updatedAt!) : isToday(o.orderDate))
-    ).length;
-    
-    final monthOrders = allOrders.where((o) => isThisMonth(o.orderDate)).toList();
-    final monthCollected = monthOrders.fold<double>(0, (sum, o) => sum + o.advancePaid);
-    final monthExpenses = _expenseController.expenses.where((e) => isThisMonth(e.date)).toList();
-    final monthTotalExpenses = monthExpenses.fold<double>(0, (sum, e) => sum + e.amount);
+    final completed = allOrders
+        .where(
+          (o) =>
+              o.status == 'Delivered' &&
+              (o.updatedAt != null
+                  ? isToday(o.updatedAt!)
+                  : isToday(o.orderDate)),
+        )
+        .length;
+
+    final monthOrders = allOrders
+        .where((o) => isThisMonth(o.orderDate))
+        .toList();
+    final monthCollected = monthOrders.fold<double>(
+      0,
+      (sum, o) => sum + o.advancePaid,
+    );
+    final monthExpenses = _expenseController.expenses
+        .where((e) => isThisMonth(e.date))
+        .toList();
+    final monthTotalExpenses = monthExpenses.fold<double>(
+      0,
+      (sum, e) => sum + e.amount,
+    );
     final monthRevenue = monthCollected - monthTotalExpenses;
 
     return GridView.count(
@@ -412,6 +401,23 @@ class _DashboardScreenState extends State<DashboardScreen>
       physics: const NeverScrollableScrollPhysics(),
       childAspectRatio: 1.4,
       children: [
+        _buildKPICard(
+          title: 'Today\'s Revenue',
+          value: todayIncome.toInt(),
+          icon: Icons.account_balance_wallet_outlined,
+          bgColor: kPrimaryColor,
+          textColor: Colors.white,
+          isCurrency: true,
+        ),
+        _buildKPICard(
+          title: 'Today\'s Expenses',
+          value: todayTotalExpenses.toInt(),
+          icon: Icons.money_off_csred_outlined,
+          bgColor: kCardColor,
+          textColor: kTextPrimary,
+          iconColor: Colors.redAccent,
+          isCurrency: true,
+        ),
         _buildKPICard(
           title: 'Today\'s Orders',
           value: total,
@@ -480,14 +486,18 @@ class _DashboardScreenState extends State<DashboardScreen>
             children: [Icon(icon, color: iconColor ?? textColor, size: 24)],
           ),
           const Spacer(),
-          AnimatedCounter(
-            targetValue: value,
-            textStyle: GoogleFonts.inter(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: textColor,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: AnimatedCounter(
+              targetValue: value,
+              textStyle: GoogleFonts.inter(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+              prefix: isCurrency ? 'PKR ' : '',
             ),
-            prefix: isCurrency ? 'PKR ' : '',
           ),
           const SizedBox(height: 4),
           Text(

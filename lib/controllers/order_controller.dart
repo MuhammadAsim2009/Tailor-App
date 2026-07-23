@@ -110,6 +110,8 @@ class OrderController extends ChangeNotifier {
         measurements: order.measurements,
         status: order.status,
         updatedAt: DateTime.now(),
+        subTotal: order.subTotal,
+        pricingItems: order.pricingItems,
       );
 
       await _dbService.insertOrder(orderToSave);

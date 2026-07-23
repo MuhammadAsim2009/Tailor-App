@@ -23,6 +23,7 @@ class MeasurementModel {
   final bool optFrontPocket;
   final String? frontPocketMeasure;
   final bool optSidePocket;
+  final String? sidePocketMeasure;
   final String cuffType;
   final String? cuffMeasure;
   final String? extraNotes;
@@ -50,6 +51,7 @@ class MeasurementModel {
     this.optFrontPocket = false,
     this.frontPocketMeasure,
     this.optSidePocket = false,
+    this.sidePocketMeasure,
     this.cuffType = 'Round',
     this.cuffMeasure,
     this.extraNotes,
@@ -79,6 +81,7 @@ class MeasurementModel {
       'optFrontPocket': optFrontPocket,
       'frontPocketMeasure': frontPocketMeasure,
       'optSidePocket': optSidePocket,
+      'sidePocketMeasure': sidePocketMeasure,
       'cuffType': cuffType,
       'cuffMeasure': cuffMeasure,
       'extraNotes': extraNotes,
@@ -109,6 +112,7 @@ class MeasurementModel {
       optFrontPocket: map['optFrontPocket'] ?? false,
       frontPocketMeasure: map['frontPocketMeasure'],
       optSidePocket: map['optSidePocket'] ?? false,
+      sidePocketMeasure: map['sidePocketMeasure'],
       cuffType: map['cuffType'] ?? 'Round',
       cuffMeasure: map['cuffMeasure'],
       extraNotes: map['extraNotes'],

@@ -10,7 +10,9 @@ import '../models/order_model.dart';
 import '../models/measurement_model.dart';
 import '../controllers/order_controller.dart';
 import '../services/whatsapp_service.dart';
+import '../services/database_service.dart';
 import 'receipt_widget.dart';
+import 'dart:convert';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
@@ -62,9 +64,12 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   final _quantityCtrl = TextEditingController(text: '1');
   DateTime? _orderDate = DateTime.now();
   DateTime? _deliveryDate = DateTime.now().add(const Duration(days: 7));
-  final _totalCtrl = TextEditingController();
+  // Pricing
+  final _subTotalCtrl = TextEditingController();
+  final _totalCtrl = TextEditingController(); // Read-only, auto-calculated
   final _advanceCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final List<Map<String, dynamic>> _pricingItems = []; // [{name, ctrl}]
 
   // ── Step 4: Measurements ──
   final _lengthCtrl = TextEditingController();
@@ -89,6 +94,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   bool _optFrontPocket = false;
   final _frontPocketCtrl = TextEditingController();
   bool _optSidePocket = false;
+  final _sidePocketCtrl = TextEditingController();
   String _cuffType = 'Round'; // Round, Double kaj, Double, Square
   final _cuffCtrl = TextEditingController();
   final _extraCtrl = TextEditingController();
@@ -96,7 +102,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   @override
   void initState() {
     super.initState();
-    _totalCtrl.addListener(_updateBalance);
+    _subTotalCtrl.addListener(_recalcTotal);
     _advanceCtrl.addListener(_updateBalance);
     _orderController.addListener(_onDataLoaded);
     // If data is already loaded, populate immediately
@@ -122,9 +128,13 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     _phoneCtrl.dispose();
     _addrCtrl.dispose();
     _quantityCtrl.dispose();
+    _subTotalCtrl.dispose();
     _totalCtrl.dispose();
     _advanceCtrl.dispose();
     _notesCtrl.dispose();
+    for (final item in _pricingItems) {
+      (item['ctrl'] as TextEditingController).dispose();
+    }
     _lengthCtrl.dispose();
     _armCtrl.dispose();
     _mundoCtrl.dispose();
@@ -142,7 +152,16 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     super.dispose();
   }
 
-  // ── Balance Calculation ──
+  // ── Pricing Calculation ──
+  void _recalcTotal() {
+    final sub = double.tryParse(_subTotalCtrl.text) ?? 0;
+    final extras = _pricingItems.fold<double>(0, (sum, item) {
+      return sum + (double.tryParse((item['ctrl'] as TextEditingController).text) ?? 0);
+    });
+    _totalCtrl.text = (sub + extras).toStringAsFixed(0);
+    setState(() {});
+  }
+
   double get _remainingBalance {
     final total = double.tryParse(_totalCtrl.text) ?? 0;
     final advance = double.tryParse(_advanceCtrl.text) ?? 0;
@@ -150,6 +169,156 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   }
 
   void _updateBalance() => setState(() {});
+
+  void _addPricingField(String name) {
+    final ctrl = TextEditingController();
+    ctrl.addListener(_recalcTotal);
+    setState(() {
+      _pricingItems.add({'name': name, 'ctrl': ctrl});
+    });
+  }
+
+  void _removePricingField(int index) {
+    final ctrl = _pricingItems[index]['ctrl'] as TextEditingController;
+    ctrl.removeListener(_recalcTotal);
+    ctrl.dispose();
+    setState(() => _pricingItems.removeAt(index));
+    _recalcTotal();
+  }
+
+  Future<void> _showAddFieldSheet() async {
+    final nameCtrl = TextEditingController();
+    List<String> savedFields = [];
+
+    // Load saved fields
+    try {
+      final raw = await DatabaseService.instance.getMetaValue('saved_pricing_fields');
+      if (raw != null && raw.isNotEmpty) {
+        final list = jsonDecode(raw) as List;
+        savedFields = list.map((e) => e.toString()).toList();
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40, height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text('Add Pricing Field',
+                        style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: kTextPri)),
+                    const SizedBox(height: 6),
+                    Text('Enter the name of the new pricing field (e.g. Stitching Fee, Tax).',
+                        style: GoogleFonts.inter(fontSize: 13, color: kTextSec)),
+                    
+                    if (savedFields.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: savedFields.map((field) {
+                          return InputChip(
+                            label: Text(field, style: GoogleFonts.inter(fontSize: 13, color: kAccent)),
+                            backgroundColor: kAccent.withValues(alpha: 0.1),
+                            side: BorderSide(color: kAccent.withValues(alpha: 0.3)),
+                            deleteIconColor: kAccent,
+                            onPressed: () {
+                              nameCtrl.text = field;
+                            },
+                            onDeleted: () async {
+                              savedFields.remove(field);
+                              setModalState(() {});
+                              await DatabaseService.instance.setMetaValue(
+                                'saved_pricing_fields',
+                                jsonEncode(savedFields),
+                              );
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: nameCtrl,
+                      autofocus: true,
+                      style: GoogleFonts.inter(fontSize: 15, color: kTextPri),
+                      decoration: InputDecoration(
+                        labelText: 'Field Name',
+                        labelStyle: GoogleFonts.inter(color: kTextSec),
+                        filled: true,
+                        fillColor: kBg,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: kAccent),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final name = nameCtrl.text.trim();
+                          if (name.isNotEmpty) {
+                            Navigator.pop(ctx);
+                            _addPricingField(name);
+
+                            // Save field for future use if not already in list
+                            if (!savedFields.contains(name)) {
+                              savedFields.add(name);
+                              await DatabaseService.instance.setMetaValue(
+                                'saved_pricing_fields',
+                                jsonEncode(savedFields),
+                              );
+                            }
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text('Add Field',
+                            style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   // ── Navigation ──
   void _nextStep() {
@@ -211,6 +380,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
       optFrontPocket: _optFrontPocket,
       frontPocketMeasure: _frontPocketCtrl.text,
       optSidePocket: _optSidePocket,
+      sidePocketMeasure: _sidePocketCtrl.text,
       cuffType: _cuffType,
       cuffMeasure: _cuffCtrl.text,
       extraNotes: _extraCtrl.text,
@@ -228,6 +398,11 @@ class _AddOrderScreenState extends State<AddOrderScreen>
       advancePaid: double.tryParse(_advanceCtrl.text) ?? 0.0,
       measurements: measurements,
       status: 'Pending',
+      subTotal: double.tryParse(_subTotalCtrl.text) ?? 0.0,
+      pricingItems: _pricingItems.map((item) => PricingItem(
+        name: item['name'] as String,
+        amount: double.tryParse((item['ctrl'] as TextEditingController).text) ?? 0,
+      )).toList(),
     );
 
     try {
@@ -246,6 +421,8 @@ class _AddOrderScreenState extends State<AddOrderScreen>
         measurements: order.measurements,
         status: 'Pending',
         updatedAt: DateTime.now(),
+        subTotal: order.subTotal,
+        pricingItems: order.pricingItems,
       );
 
       // Send text confirmation to WhatsApp if phone is available
@@ -341,6 +518,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
     _optFrontPocket = m.optFrontPocket;
     _frontPocketCtrl.text = m.frontPocketMeasure ?? '';
     _optSidePocket = m.optSidePocket;
+    _sidePocketCtrl.text = m.sidePocketMeasure ?? '';
     _cuffType = m.cuffType;
     _cuffCtrl.text = m.cuffMeasure ?? '';
     _extraCtrl.text = m.extraNotes ?? '';
@@ -847,17 +1025,109 @@ class _AddOrderScreenState extends State<AddOrderScreen>
             _SectionCard(
               title: 'Pricing',
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Sub Total (required)
                   _InputField(
-                    controller: _totalCtrl,
-                    label: 'Total Amount (PKR)',
+                    controller: _subTotalCtrl,
+                    label: 'Sub Total (PKR) *',
                     hint: '0',
-                    icon: Icons.money,
+                    icon: Icons.receipt_outlined,
                     keyboardType: TextInputType.number,
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        (v == null || v.trim().isEmpty) ? 'Sub Total is required' : null,
+                  ),
+
+                  // Extra pricing line items
+                  for (int i = 0; i < _pricingItems.length; i++) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: _InputField(
+                            controller: _pricingItems[i]['ctrl'] as TextEditingController,
+                            label: _pricingItems[i]['name'] as String,
+                            hint: '0',
+                            icon: Icons.label_outline,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () => _removePricingField(i),
+                          child: Container(
+                            height: 50,
+                            width: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // Add Field button
+                  const SizedBox(height: 14),
+                  GestureDetector(
+                    onTap: _showAddFieldSheet,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: kAccent.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: kAccent.withValues(alpha: 0.3), style: BorderStyle.solid),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_circle_outline, color: kAccent, size: 18),
+                          const SizedBox(width: 8),
+                          Text('Add Pricing Field',
+                              style: GoogleFonts.inter(fontSize: 14, color: kAccent, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Divider
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 12),
+
+                  // Total Amount (read-only, auto-calculated)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: kPrimary.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.calculate_outlined, size: 18, color: kPrimary),
+                            const SizedBox(width: 8),
+                            Text('Total Amount',
+                                style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: kPrimary)),
+                          ],
+                        ),
+                        Text(
+                          'PKR ${_totalCtrl.text.isEmpty ? "0" : _totalCtrl.text}',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimary, fontSize: 16),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
+
                   _InputField(
                     controller: _advanceCtrl,
                     label: 'Advance Paid (PKR)',
@@ -1315,12 +1585,31 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                 const SizedBox(height: 12),
 
                 // 12. Side Pocket
-                _buildOptionCheckbox(
-                  'Side Pocket',
-                  _optSidePocket,
-                  _measurementsLocked
-                      ? null
-                      : (v) => setState(() => _optSidePocket = v),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: _buildOptionCheckbox(
+                        'Side Pocket',
+                        _optSidePocket,
+                        _measurementsLocked
+                            ? null
+                            : (v) => setState(() => _optSidePocket = v),
+                      ),
+                    ),
+                    if (_optSidePocket)
+                      Expanded(
+                        flex: 1,
+                        child: _buildCompactMeasureField(
+                          '',
+                          _sidePocketCtrl,
+                          readOnly: _measurementsLocked,
+                        ),
+                      )
+                    else
+                      const Spacer(),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 const Divider(),
@@ -1398,12 +1687,12 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                       maxLines: 3,
                       style: GoogleFonts.inter(
                         fontSize: 14,
-                        color: _measurementsLocked ? kTextSec : kTextPri,
+                        color: kTextPri, // Always readable
                       ),
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: _measurementsLocked
-                            ? Colors.grey.shade100
+                            ? Colors.grey.shade50
                             : kBg,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -1412,15 +1701,16 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide(
-                            color: _measurementsLocked
-                                ? Colors.grey.shade300
-                                : Colors.grey.shade200,
+                            color: Colors.grey.shade200,
                           ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: const BorderSide(color: kAccent),
                         ),
+                        suffixIcon: _measurementsLocked
+                            ? const Icon(Icons.lock_outline, size: 14, color: kTextSec)
+                            : null,
                       ),
                     ),
                   ],
@@ -1466,7 +1756,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: readOnly ? kTextSec : kTextPri,
+            color: kTextPri, // Always show text clearly, lock icon indicates readonly
           ),
           decoration: InputDecoration(
             contentPadding: const EdgeInsets.symmetric(
@@ -1474,7 +1764,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
               vertical: 8,
             ),
             filled: true,
-            fillColor: readOnly ? Colors.grey.shade100 : kBg,
+            fillColor: readOnly ? Colors.grey.shade50 : kBg,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide.none,
@@ -1482,7 +1772,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
-                color: readOnly ? Colors.grey.shade300 : Colors.grey.shade200,
+                color: readOnly ? Colors.grey.shade200 : Colors.grey.shade200,
               ),
             ),
             focusedBorder: OutlineInputBorder(

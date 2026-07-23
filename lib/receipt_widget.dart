@@ -131,6 +131,24 @@ class ReceiptWidget extends StatelessWidget {
             ),
             child: Column(
               children: [
+                // Sub Total
+                _buildPaymentRow(
+                  'Sub Total:',
+                  'PKR ${order.subTotal.toStringAsFixed(0)}',
+                  Colors.white,
+                ),
+                // Extra pricing items
+                for (final item in order.pricingItems) ...[
+                  const SizedBox(height: 6),
+                  _buildPaymentRow(
+                    '${item.name}:',
+                    'PKR ${item.amount.toStringAsFixed(0)}',
+                    Colors.white,
+                  ),
+                ],
+                // Divider before Total
+                if (order.subTotal > 0 || order.pricingItems.isNotEmpty)
+                  const Divider(color: Colors.white24, height: 16),
                 _buildPaymentRow('Total Amount:', 'PKR ${order.totalAmount.toStringAsFixed(0)}', Colors.white),
                 const SizedBox(height: 8),
                 _buildPaymentRow('Advance Paid:', 'PKR ${order.advancePaid.toStringAsFixed(0)}', kAccentColor),

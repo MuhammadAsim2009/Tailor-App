@@ -23,7 +23,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 6,
+      version: 9,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -88,6 +88,30 @@ CREATE TABLE IF NOT EXISTS meta (
 )
 ''');
     }
+    if (oldVersion < 7) {
+      // Add pricing breakdown columns
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN subTotal REAL DEFAULT 0;');
+        await db.execute('ALTER TABLE orders ADD COLUMN pricingJson TEXT;');
+      } catch (e) {
+        // Ignore if columns already exist
+      }
+    }
+    if (oldVersion < 8) {
+      // Ensure pricing breakdown columns exist
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN subTotal REAL DEFAULT 0;');
+      } catch (_) {}
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN pricingJson TEXT;');
+      } catch (_) {}
+    }
+    if (oldVersion < 9) {
+      // Add pickedUpQuantity column
+      try {
+        await db.execute('ALTER TABLE orders ADD COLUMN pickedUpQuantity INTEGER DEFAULT 0;');
+      } catch (_) {}
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -118,6 +142,9 @@ CREATE TABLE orders (
   status TEXT NOT NULL,
   updatedAt TEXT,
   deletedAt TEXT,
+  subTotal REAL DEFAULT 0,
+  pricingJson TEXT,
+  pickedUpQuantity INTEGER DEFAULT 0,
   FOREIGN KEY (customerId) REFERENCES customers (id) ON DELETE CASCADE
 )
 ''');
