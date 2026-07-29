@@ -10,6 +10,7 @@ class CustomerModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
+  final String? familyId;
 
   CustomerModel({
     required this.id,
@@ -20,6 +21,7 @@ class CustomerModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.deletedAt,
+    this.familyId,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? createdAt ?? DateTime.now();
 
@@ -39,6 +41,8 @@ class CustomerModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
+    String? familyId,
+    bool clearFamilyId = false,
   }) {
     return CustomerModel(
       id: id ?? this.id,
@@ -49,6 +53,7 @@ class CustomerModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      familyId: clearFamilyId ? null : (familyId ?? this.familyId),
     );
   }
 
@@ -58,10 +63,11 @@ class CustomerModel {
       'name': name,
       'phone': phone,
       'address': address,
-      'measurements': measurements?.toJson(), // Store as JSON string in DB
+      'measurements': measurements?.toJson(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'deletedAt': deletedAt?.toIso8601String(),
+      'familyId': familyId,
     };
   }
 
@@ -77,6 +83,7 @@ class CustomerModel {
       createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt']) : null,
       updatedAt: map['updatedAt'] != null ? DateTime.tryParse(map['updatedAt']) : null,
       deletedAt: map['deletedAt'] != null ? DateTime.tryParse(map['deletedAt']) : null,
+      familyId: map['familyId'] as String?,
     );
   }
 
@@ -90,6 +97,7 @@ class CustomerModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
+      'familyId': familyId,
     };
   }
 
@@ -105,6 +113,7 @@ class CustomerModel {
       createdAt: map['createdAt'] is Timestamp ? (map['createdAt'] as Timestamp).toDate() : null,
       updatedAt: map['updatedAt'] is Timestamp ? (map['updatedAt'] as Timestamp).toDate() : null,
       deletedAt: map['deletedAt'] is Timestamp ? (map['deletedAt'] as Timestamp).toDate() : null,
+      familyId: map['familyId'] as String?,
     );
   }
 }

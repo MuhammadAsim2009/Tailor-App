@@ -37,14 +37,15 @@ class OrderDetailScreen extends StatefulWidget {
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
 }
 
-class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProviderStateMixin {
+class _OrderDetailScreenState extends State<OrderDetailScreen>
+    with TickerProviderStateMixin {
   bool _isDownloading = false;
   bool _isSharing = false;
   final ScreenshotController _screenshotController = ScreenshotController();
-  
+
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  
+
   late OrderModel _currentOrder;
 
   @override
@@ -66,7 +67,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     super.dispose();
   }
 
-  double get _remainingAmount => _currentOrder.totalAmount - _currentOrder.advancePaid;
+  double get _remainingAmount =>
+      _currentOrder.totalAmount - _currentOrder.advancePaid;
   bool get _isFullyPaid => _remainingAmount <= 0;
 
   Color _getStatusColor(String status) {
@@ -86,7 +88,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
 
   Future<void> _downloadReceipt() async {
     setState(() => _isDownloading = true);
-    
+
     try {
       // gal handles gallery permission natively
       final hasAccess = await Gal.requestAccess();
@@ -94,7 +96,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Gallery permission denied. Please allow in Settings.'),
+              content: const Text(
+                'Gallery permission denied. Please allow in Settings.',
+              ),
               backgroundColor: Colors.red.shade600,
               action: SnackBarAction(
                 label: 'Settings',
@@ -124,7 +128,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
               children: [
                 const Icon(Icons.check_circle, color: Colors.white),
                 const SizedBox(width: 8),
-                Text('Receipt saved to gallery! 📥', style: GoogleFonts.inter(color: Colors.white)),
+                Text(
+                  'Receipt saved to gallery! 📥',
+                  style: GoogleFonts.inter(color: Colors.white),
+                ),
               ],
             ),
             backgroundColor: kAccent,
@@ -175,7 +182,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
       final bytes = await _captureReceiptBytes();
       await WhatsAppService.shareReceiptToWhatsApp(
         imageBytes: bytes,
-        customerName: widget.customer.name.isNotEmpty ? widget.customer.name : 'Customer',
+        customerName: widget.customer.name.isNotEmpty
+            ? widget.customer.name
+            : 'Customer',
         orderId: _currentOrder.id,
         totalAmount: _currentOrder.totalAmount,
         advancePaid: _currentOrder.advancePaid,
@@ -253,7 +262,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             const SizedBox(height: 16),
             _buildOrderInfoCard(),
             const SizedBox(height: 16),
-            if (_currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered') ...[
+            if (_currentOrder.status == 'Ready' ||
+                _currentOrder.status == 'Delivered') ...[
               _buildPickupTrackingCard(),
               const SizedBox(height: 16),
             ],
@@ -316,15 +326,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                     const SizedBox(height: 4),
                     Text(
                       'ID: ${widget.customer.id}',
-                      style: GoogleFonts.inter(fontSize: 13, color: kAccent, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: kAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.customer.phone,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: kTextSec,
-                      ),
+                      style: GoogleFonts.inter(fontSize: 14, color: kTextSec),
                     ),
                   ],
                 ),
@@ -347,11 +358,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                 children: [
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(_currentOrder.status).withValues(alpha: 0.1),
+                      color: _getStatusColor(
+                        _currentOrder.status,
+                      ).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _getStatusColor(_currentOrder.status)),
+                      border: Border.all(
+                        color: _getStatusColor(_currentOrder.status),
+                      ),
                     ),
                     child: Text(
                       _currentOrder.status,
@@ -368,6 +386,122 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           ),
         ],
       ),
+    );
+  }
+
+  void _showRecordPaymentDialog() {
+    final amountCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: kCard,
+          title: Text(
+            'Record Payment',
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              color: kPrimary,
+            ),
+          ),
+          content: TextField(
+            controller: amountCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Payment Amount',
+              labelStyle: GoogleFonts.inter(color: kTextSec),
+              hintText: 'e.g. 500',
+              filled: true,
+              fillColor: kBg,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('Cancel', style: GoogleFonts.inter(color: kTextSec)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                if (amount <= 0) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter a valid amount'),
+                    ),
+                  );
+                  return;
+                }
+                final newAdvance = _currentOrder.advancePaid + amount;
+                if (newAdvance > _currentOrder.totalAmount) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Payment cannot exceed the remaining amount (${_remainingAmount.toStringAsFixed(0)})!',
+                      ),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                  return;
+                }
+
+                // Capture messenger from the OUTER scaffold before closing dialog
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.pop(dialogContext);
+
+                try {
+                  await OrderController().markOrderAsPaid(
+                    _currentOrder.id,
+                    newAdvance,
+                  );
+                  if (mounted) {
+                    setState(() {
+                      _currentOrder = _currentOrder.copyWith(
+                        advancePaid: newAdvance,
+                      );
+                    });
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Payment recorded successfully!',
+                          style: GoogleFonts.inter(color: Colors.white),
+                        ),
+                        backgroundColor: kAccent,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Error recording payment: $e')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                'Save',
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -398,12 +532,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             ),
           ),
           const SizedBox(height: 16),
-          _buildAmountRow('Total Amount:', _currentOrder.totalAmount, Colors.white),
+          _buildAmountRow(
+            'Total Amount:',
+            _currentOrder.totalAmount,
+            Colors.white,
+          ),
           const SizedBox(height: 12),
           _buildAmountRow('Advance Paid:', _currentOrder.advancePaid, kAccent),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
+            child: Divider(
+              color: Colors.white.withValues(alpha: 0.2),
+              height: 1,
+            ),
           ),
           _buildAmountRow(
             'Remaining:',
@@ -414,7 +555,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           if (_isFullyPaid)
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: kAccent.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(kR),
@@ -433,50 +577,93 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           else
             Column(
               children: [
-                ScaleTransition(
-                  scale: _pulseAnimation,
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          await OrderController().markOrderAsPaid(_currentOrder.id, _currentOrder.totalAmount);
-                          if (mounted) {
-                            setState(() {
-                              _currentOrder = _currentOrder.copyWith(advancePaid: _currentOrder.totalAmount);
-                            });
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Order marked as Paid!',
-                                  style: GoogleFonts.inter(color: Colors.white),
-                                ),
-                                backgroundColor: kAccent,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Error updating order: $e')),
-                            );
-                          }
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kAccent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _showRecordPaymentDialog,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        icon: const Icon(Icons.add_card, size: 20),
+                        label: Text(
+                          'Record Payment',
+                          style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                        ),
                       ),
-                      child: Text('Mark as Paid', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ScaleTransition(
+                        scale: _pulseAnimation,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            try {
+                              await OrderController().markOrderAsPaid(
+                                _currentOrder.id,
+                                _currentOrder.totalAmount,
+                              );
+                              if (mounted) {
+                                setState(() {
+                                  _currentOrder = _currentOrder.copyWith(
+                                    advancePaid: _currentOrder.totalAmount,
+                                  );
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Order marked as Paid!',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    backgroundColor: kAccent,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error updating order: $e'),
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kAccent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            size: 20,
+                          ),
+                          label: Text(
+                            'Mark Paid',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
@@ -486,11 +673,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                     icon: const Icon(Icons.chat_bubble_outline, color: kAccent),
                     label: Text(
                       'Payment Reminder',
-                      style: GoogleFonts.inter(color: kAccent, fontWeight: FontWeight.bold),
+                      style: GoogleFonts.inter(
+                        color: kAccent,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: kAccent, width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: () async {
                       bool success = await WhatsAppService.sendPaymentReminder(
@@ -502,7 +694,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                       if (!success && mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text('Could not open WhatsApp. Is it installed?'),
+                            content: const Text(
+                              'Could not open WhatsApp. Is it installed?',
+                            ),
                             backgroundColor: Colors.red.shade600,
                           ),
                         );
@@ -523,10 +717,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
       children: [
         Text(
           label,
-          style: GoogleFonts.inter(
-            color: Colors.white70,
-            fontSize: 14,
-          ),
+          style: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
         ),
         TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: 0, end: amount),
@@ -554,15 +745,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildInfoRow(Icons.calendar_today_outlined, 'Order Date', DateFormat('dd MMM yyyy').format(_currentOrder.orderDate)),
+          _buildInfoRow(
+            Icons.calendar_today_outlined,
+            'Order Date',
+            DateFormat('dd MMM yyyy').format(_currentOrder.orderDate),
+          ),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.local_shipping_outlined, 'Delivery Date', DateFormat('dd MMM yyyy').format(_currentOrder.deliveryDate)),
+          _buildInfoRow(
+            Icons.local_shipping_outlined,
+            'Delivery Date',
+            DateFormat('dd MMM yyyy').format(_currentOrder.deliveryDate),
+          ),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.format_list_numbered_outlined, 'Quantity', _currentOrder.quantity.toString()),
+          _buildInfoRow(
+            Icons.format_list_numbered_outlined,
+            'Quantity',
+            _currentOrder.quantity.toString(),
+          ),
           const SizedBox(height: 16),
           const Divider(height: 1),
           const SizedBox(height: 16),
-          _buildFullWidthNote(Icons.notes_outlined, 'Special Notes', _currentOrder.measurements.extraNotes?.isNotEmpty == true ? _currentOrder.measurements.extraNotes! : 'No notes.'),
+          _buildFullWidthNote(
+            Icons.notes_outlined,
+            'Special Notes',
+            _currentOrder.measurements.extraNotes?.isNotEmpty == true
+                ? _currentOrder.measurements.extraNotes!
+                : 'No notes.',
+          ),
         ],
       ),
     );
@@ -598,7 +807,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: kAccent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -615,36 +827,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             ],
           ),
           const SizedBox(height: 16),
-          
+
           // Progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: _currentOrder.quantity > 0 ? _currentOrder.pickedUpQuantity / _currentOrder.quantity : 0,
+              value: _currentOrder.quantity > 0
+                  ? _currentOrder.pickedUpQuantity / _currentOrder.quantity
+                  : 0,
               backgroundColor: Colors.grey.shade200,
-              color: _currentOrder.pickedUpQuantity >= _currentOrder.quantity ? Colors.green : kAccent,
+              color: _currentOrder.pickedUpQuantity >= _currentOrder.quantity
+                  ? Colors.green
+                  : kAccent,
               minHeight: 10,
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Add Pickup buttons
           Row(
             children: [
               Expanded(
                 child: Text(
                   'Record Pickup:',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    color: kTextSec,
-                  ),
+                  style: GoogleFonts.inter(fontSize: 14, color: kTextSec),
                 ),
               ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildPickupButton(-1, Icons.remove, color: Colors.red.shade400),
+                  _buildPickupButton(
+                    -1,
+                    Icons.remove,
+                    color: Colors.red.shade400,
+                  ),
                   const SizedBox(width: 12),
                   Text(
                     'Qty',
@@ -660,13 +877,50 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
               ),
             ],
           ),
+          if (_currentOrder.pickedUpQuantity < _currentOrder.quantity) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.chat_bubble_outline, color: kAccent),
+                label: Text(
+                  'Pickup Reminder',
+                  style: GoogleFonts.inter(color: kAccent, fontWeight: FontWeight.bold),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: kAccent, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  int remaining = _currentOrder.quantity - _currentOrder.pickedUpQuantity;
+                  bool success = await WhatsAppService.sendPickupReminder(
+                    phoneNumber: widget.customer.phone,
+                    customerName: widget.customer.name,
+                    orderId: _currentOrder.id,
+                    remainingPickup: remaining,
+                    totalQuantity: _currentOrder.quantity,
+                  );
+                  if (!success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Could not open WhatsApp. Is it installed?'),
+                        backgroundColor: Colors.red.shade600,
+                      ),
+                    );
+                  }
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   Widget _buildPickupButton(int change, IconData icon, {required Color color}) {
-    final bool canAdd = change > 0 && _currentOrder.pickedUpQuantity < _currentOrder.quantity;
+    final bool canAdd =
+        change > 0 && _currentOrder.pickedUpQuantity < _currentOrder.quantity;
     final bool canRemove = change < 0 && _currentOrder.pickedUpQuantity > 0;
     final bool isEnabled = canAdd || canRemove;
 
@@ -692,13 +946,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
 
   Future<void> _updatePickupQuantity(int change) async {
     final newQuantity = _currentOrder.pickedUpQuantity + change;
-    
+
     // Safety check
     if (newQuantity < 0 || newQuantity > _currentOrder.quantity) return;
-    
+
     try {
-      final updatedOrder = _currentOrder.copyWith(pickedUpQuantity: newQuantity);
-      
+      final updatedOrder = _currentOrder.copyWith(
+        pickedUpQuantity: newQuantity,
+      );
+
       // We need to implement an update order method that just saves the current order state
       // For now, if your controller doesn't have a direct save method for the whole order,
       // we might need to add it, or we can use DatabaseService directly.
@@ -710,19 +966,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           whereArgs: [_currentOrder.id],
         );
       });
-      
+
       setState(() {
         _currentOrder = updatedOrder;
       });
-      
+
       // Auto-mark as delivered if all items are picked up? Optional UX improvement.
       // If the user wants to keep "Mark Delivered" manual, we skip it.
-      
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating pickup: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating pickup: $e')));
       }
     }
   }
@@ -733,11 +988,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
         Icon(icon, size: 20, color: kTextSec),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(label, style: GoogleFonts.inter(fontSize: 14, color: kTextSec)),
+          child: Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 14, color: kTextSec),
+          ),
         ),
         Text(
           value,
-          style: GoogleFonts.inter(fontSize: 14, color: kTextPri, fontWeight: FontWeight.w600),
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: kTextPri,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -753,7 +1015,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             const SizedBox(width: 8),
             Text(
               label,
-              style: GoogleFonts.inter(fontSize: 14, color: kPrimary, fontWeight: FontWeight.w600),
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: kPrimary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -771,38 +1037,62 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     final m = _currentOrder.measurements;
     final rows = <Widget>[];
 
-    void addRow(String label, String? measure, [List<String> options = const []]) {
+    void addRow(
+      String label,
+      String? measure, [
+      List<String> options = const [],
+    ]) {
       if ((measure != null && measure.isNotEmpty) || options.isNotEmpty) {
-        rows.add(Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Text(label, style: GoogleFonts.inter(fontSize: 14, color: kTextSec)),
-              ),
-              if (options.isNotEmpty)
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
                 Expanded(
-                  flex: 4,
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: options.map((opt) => Text(
-                      '($opt)',
-                      style: GoogleFonts.inter(fontSize: 16, color: kAccent, fontWeight: FontWeight.w500),
-                    )).toList(),
+                  flex: 3,
+                  child: Text(
+                    label,
+                    style: GoogleFonts.inter(fontSize: 14, color: kTextSec),
                   ),
-                )
-              else
-                const Spacer(flex: 4),
-              if (measure != null && measure.isNotEmpty) ...[
-                const SizedBox(width: 8),
-                Text(measure, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: kTextPri)),
+                ),
+                if (options.isNotEmpty)
+                  Expanded(
+                    flex: 4,
+                    child: Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: options
+                          .map(
+                            (opt) => Text(
+                              '($opt)',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                color: kAccent,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  )
+                else
+                  const Spacer(flex: 4),
+                if (measure != null && measure.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    measure,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: kTextPri,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ));
+        );
         rows.add(Divider(color: Colors.grey.shade200, height: 1));
       }
     }
@@ -810,7 +1100,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     addRow('Length', m.lengthMeasure);
     addRow('Arm', m.armMeasure, [
       if (m.optMundo || (m.mundoMeasure != null && m.mundoMeasure!.isNotEmpty))
-        'Mundo${m.mundoMeasure != null && m.mundoMeasure!.isNotEmpty ? ": ${m.mundoMeasure}" : ""}'
+        'Mundo${m.mundoMeasure != null && m.mundoMeasure!.isNotEmpty ? ": ${m.mundoMeasure}" : ""}',
     ]);
     addRow('Shoulder', m.shoulderMeasure);
     addRow('Collar', m.collarMeasure, [
@@ -828,11 +1118,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     ]);
     addRow('Bottom', m.bottomMeasure);
     addRow('Plate', m.plateMeasure);
-    addRow('Front Pocket', m.frontPocketMeasure, [if (m.optFrontPocket) 'Front Pocket']);
+    addRow('Front Pocket', m.frontPocketMeasure, [
+      if (m.optFrontPocket) 'Front Pocket',
+    ]);
     if (m.optSidePocket) {
       addRow('Side Pocket', null, ['Side Pocket']);
     }
-    if ((m.cuffType.toString().isNotEmpty && m.cuffType != 'None') || (m.cuffMeasure != null && m.cuffMeasure!.isNotEmpty)) {
+    if ((m.cuffType.toString().isNotEmpty && m.cuffType != 'None') ||
+        (m.cuffMeasure != null && m.cuffMeasure!.isNotEmpty)) {
       List<String> options = [];
       if (m.cuffType.toString().isNotEmpty && m.cuffType != 'None') {
         options.add(m.cuffType.toString());
@@ -846,9 +1139,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Extra', style: GoogleFonts.inter(fontSize: 14, color: kTextSec)),
+              Text(
+                'Extra',
+                style: GoogleFonts.inter(fontSize: 14, color: kTextSec),
+              ),
               const SizedBox(height: 6),
-              Text(m.extraNotes!, style: GoogleFonts.inter(fontSize: 14, color: kTextPri, height: 1.5)),
+              Text(
+                m.extraNotes!,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: kTextPri,
+                  height: 1.5,
+                ),
+              ),
             ],
           ),
         ),
@@ -863,13 +1166,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
     if (rows.isEmpty) {
       return _buildSectionCard(
         title: 'Measurements',
-        child: Text('No measurements provided.', style: GoogleFonts.inter(color: kTextSec)),
+        child: Text(
+          'No measurements provided.',
+          style: GoogleFonts.inter(color: kTextSec),
+        ),
       );
     }
 
     return _buildSectionCard(
       title: 'Measurements',
-      trailing: Text('inches', style: GoogleFonts.inter(color: kTextSec, fontSize: 12)),
+      trailing: Text(
+        'inches',
+        style: GoogleFonts.inter(color: kTextSec, fontSize: 12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: rows,
@@ -880,10 +1189,39 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
   // 5. TIMELINE CARD
   Widget _buildTimelineCard() {
     final timelineSteps = [
-      {'title': 'Order Placed', 'date': DateFormat('dd MMM yyyy').format(_currentOrder.orderDate), 'done': true},
-      {'title': 'In Progress', 'date': _currentOrder.status == 'In Progress' || _currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered' ? DateFormat('dd MMM yyyy').format(_currentOrder.orderDate) : 'Pending', 'done': _currentOrder.status != 'Pending'},
-      {'title': 'Ready for Pickup', 'date': _currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered' ? 'Done' : 'Pending', 'done': _currentOrder.status == 'Ready' || _currentOrder.status == 'Delivered'},
-      {'title': 'Delivered', 'date': _currentOrder.status == 'Delivered' ? DateFormat('dd MMM yyyy').format(_currentOrder.deliveryDate) : 'Pending', 'done': _currentOrder.status == 'Delivered'},
+      {
+        'title': 'Order Placed',
+        'date': DateFormat('dd MMM yyyy').format(_currentOrder.orderDate),
+        'done': true,
+      },
+      {
+        'title': 'In Progress',
+        'date':
+            _currentOrder.status == 'In Progress' ||
+                _currentOrder.status == 'Ready' ||
+                _currentOrder.status == 'Delivered'
+            ? DateFormat('dd MMM yyyy').format(_currentOrder.orderDate)
+            : 'Pending',
+        'done': _currentOrder.status != 'Pending',
+      },
+      {
+        'title': 'Ready for Pickup',
+        'date':
+            _currentOrder.status == 'Ready' ||
+                _currentOrder.status == 'Delivered'
+            ? 'Done'
+            : 'Pending',
+        'done':
+            _currentOrder.status == 'Ready' ||
+            _currentOrder.status == 'Delivered',
+      },
+      {
+        'title': 'Delivered',
+        'date': _currentOrder.status == 'Delivered'
+            ? DateFormat('dd MMM yyyy').format(_currentOrder.deliveryDate)
+            : 'Pending',
+        'done': _currentOrder.status == 'Delivered',
+      },
     ];
 
     return _buildSectionCard(
@@ -919,7 +1257,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                               ),
                             ),
                             child: isDone
-                                ? const Icon(Icons.check, size: 14, color: Colors.white)
+                                ? const Icon(
+                                    Icons.check,
+                                    size: 14,
+                                    color: Colors.white,
+                                  )
                                 : null,
                           ),
                           if (!isLast)
@@ -940,7 +1282,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                               step['title'] as String,
                               style: GoogleFonts.inter(
                                 fontSize: 15,
-                                fontWeight: isDone ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: isDone
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                                 color: isDone ? kTextPri : kTextSec,
                               ),
                             ),
@@ -970,7 +1314,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
   // 6. BOTTOM ACTIONS
   Widget _buildBottomActions() {
     final bool isDelivered = _currentOrder.status == 'Delivered';
-    final bool showMarkReady = _currentOrder.status == 'Pending' || _currentOrder.status == 'In Progress';
+    final bool showMarkReady =
+        _currentOrder.status == 'Pending' ||
+        _currentOrder.status == 'In Progress';
 
     return Column(
       children: [
@@ -978,103 +1324,120 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
         if (!isDelivered) ...[
           Row(
             children: [
-            Expanded(
-              child: SizedBox(
-                height: 54,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => EditOrderScreen(
-                          order: _currentOrder,
-                          customer: widget.customer,
+              Expanded(
+                child: SizedBox(
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => EditOrderScreen(
+                            order: _currentOrder,
+                            customer: widget.customer,
+                          ),
                         ),
+                      ).then((updatedOrder) {
+                        if (updatedOrder != null &&
+                            updatedOrder is OrderModel) {
+                          setState(() {
+                            _currentOrder = updatedOrder;
+                          });
+                        }
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kPrimary,
+                      side: const BorderSide(color: kPrimary, width: 2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(kR),
                       ),
-                    ).then((updatedOrder) {
-                      if (updatedOrder != null && updatedOrder is OrderModel) {
-                        setState(() {
-                          _currentOrder = updatedOrder;
-                        });
-                      }
-                    });
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: kPrimary,
-                    side: const BorderSide(color: kPrimary, width: 2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                    ),
+                    child: Text(
+                      'Edit Order',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  child: Text('Edit Order', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
                 ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: SizedBox(
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      await OrderController().updateOrderStatus(_currentOrder.id, 'Delivered');
-                      if (mounted) {
-                        if (widget.customer.phone.isNotEmpty) {
-                          bool success = await WhatsAppService.sendOrderDeliveredMessage(
-                            phoneNumber: widget.customer.phone,
-                            customerName: widget.customer.name,
-                            totalAmount: _currentOrder.totalAmount,
-                            advancePaid: _currentOrder.advancePaid,
-                          );
-                          if (!success && mounted) {
+              const SizedBox(width: 16),
+              Expanded(
+                child: SizedBox(
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      try {
+                        await OrderController().updateOrderStatus(
+                          _currentOrder.id,
+                          'Delivered',
+                        );
+                        if (mounted) {
+                          if (widget.customer.phone.isNotEmpty) {
+                            bool success =
+                                await WhatsAppService.sendOrderDeliveredMessage(
+                                  phoneNumber: widget.customer.phone,
+                                  customerName: widget.customer.name,
+                                  totalAmount: _currentOrder.totalAmount,
+                                  advancePaid: _currentOrder.advancePaid,
+                                );
+                            if (!success && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text(
+                                    'Could not open WhatsApp. Is it installed?',
+                                  ),
+                                  backgroundColor: Colors.red.shade600,
+                                ),
+                              );
+                            }
+                          }
+
+                          if (mounted) {
+                            Navigator.pop(context, true);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: const Text('Could not open WhatsApp. Is it installed?'),
-                                backgroundColor: Colors.red.shade600,
+                                content: Text(
+                                  'Order marked as Delivered!',
+                                  style: GoogleFonts.inter(color: Colors.white),
+                                ),
+                                backgroundColor: kAccent,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                             );
                           }
                         }
-                        
+                      } catch (e) {
                         if (mounted) {
-                          Navigator.pop(context, true);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Order marked as Delivered!',
-                                style: GoogleFonts.inter(color: Colors.white),
-                              ),
-                              backgroundColor: kAccent,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
+                            SnackBar(content: Text('Error updating order: $e')),
                           );
                         }
                       }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error updating order: $e')),
-                        );
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kAccent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
-                    elevation: 0,
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(kR),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Mark Delivered',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+                    ),
                   ),
-                  child: Text('Mark Delivered', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
         ],
-        
+
         if (!isDelivered) const SizedBox(height: 16),
-        
+
         // Row 2: Download & Share (Always visible)
         _buildDownloadReceiptButton(),
 
@@ -1087,29 +1450,40 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             child: ElevatedButton.icon(
               onPressed: () async {
                 try {
-                  await OrderController().updateOrderStatus(_currentOrder.id, 'Ready');
+                  await OrderController().updateOrderStatus(
+                    _currentOrder.id,
+                    'Ready',
+                  );
                   if (mounted) {
                     setState(() {
                       _currentOrder = _currentOrder.copyWith(status: 'Ready');
                     });
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Order marked as Ready! Notification sent.', style: GoogleFonts.inter(color: Colors.white)),
+                        content: Text(
+                          'Order marked as Ready! Notification sent.',
+                          style: GoogleFonts.inter(color: Colors.white),
+                        ),
                         backgroundColor: kAccent,
                         behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     );
                     if (widget.customer.phone.isNotEmpty) {
-                      bool success = await WhatsAppService.sendOrderReadyMessage(
-                        phoneNumber: widget.customer.phone,
-                        customerName: widget.customer.name,
-                        orderId: _currentOrder.id,
-                      );
+                      bool success =
+                          await WhatsAppService.sendOrderReadyMessage(
+                            phoneNumber: widget.customer.phone,
+                            customerName: widget.customer.name,
+                            orderId: _currentOrder.id,
+                          );
                       if (!success && mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text('Could not open WhatsApp. Is it installed?'),
+                            content: const Text(
+                              'Could not open WhatsApp. Is it installed?',
+                            ),
                             backgroundColor: Colors.red.shade600,
                           ),
                         );
@@ -1125,10 +1499,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
                 }
               },
               icon: const Icon(Icons.check_circle_outline, color: Colors.white),
-              label: Text('Mark Ready & Notify', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: Colors.white)),
+              label: Text(
+                'Mark Ready & Notify',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(kR),
+                ),
               ),
             ),
           ),
@@ -1138,7 +1520,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
   }
 
   // HELPER FOR SECTION CARDS
-  Widget _buildSectionCard({required String title, Widget? trailing, required Widget child}) {
+  Widget _buildSectionCard({
+    required String title,
+    Widget? trailing,
+    required Widget child,
+  }) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -1181,10 +1567,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(kR),
+          ),
           title: Text(
             'Delete Order',
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimary),
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              color: kPrimary,
+            ),
           ),
           content: Text(
             'Are you sure you want to delete this order? This action cannot be undone.',
@@ -1195,7 +1586,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
               onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 'Cancel',
-                style: GoogleFonts.inter(color: kTextSec, fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(
+                  color: kTextSec,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             ElevatedButton(
@@ -1229,11 +1623,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red.shade600,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: Text(
                 'Delete',
-                style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -1251,16 +1650,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             child: OutlinedButton.icon(
               onPressed: _isDownloading ? null : _downloadReceipt,
               icon: _isDownloading
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.download_outlined),
               label: Text(
                 _isDownloading ? 'Saving...' : 'Download',
-                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15),
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: kPrimary,
                 side: const BorderSide(color: kPrimary, width: 2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(kR),
+                ),
               ),
             ),
           ),
@@ -1272,15 +1680,28 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with TickerProvid
             child: ElevatedButton.icon(
               onPressed: _isSharing ? null : _shareReceipt,
               icon: _isSharing
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Icon(Icons.share_outlined, color: Colors.white),
               label: Text(
                 _isSharing ? 'Sharing...' : 'Share',
-                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Colors.white,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kR)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(kR),
+                ),
                 elevation: 0,
               ),
             ),

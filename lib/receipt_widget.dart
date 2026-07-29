@@ -17,17 +17,13 @@ class ReceiptWidget extends StatelessWidget {
   final OrderModel order;
   final CustomerModel customer;
 
-  const ReceiptWidget({
-    super.key,
-    required this.order,
-    required this.customer,
-  });
+  const ReceiptWidget({super.key, required this.order, required this.customer});
 
   @override
   Widget build(BuildContext context) {
     final double remaining = order.totalAmount - order.advancePaid;
     final bool isPaid = remaining <= 0;
-    
+
     return Container(
       color: Colors.white,
       width: 450, // Fixed width for generated receipt
@@ -68,7 +64,8 @@ class ReceiptWidget extends StatelessWidget {
                   style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                 ),
                 Text(
-                  ProfileController().profile?.address ?? 'Main Market, Larkana',
+                  ProfileController().profile?.address ??
+                      'Main Market, Larkana',
                   style: GoogleFonts.inter(color: Colors.white, fontSize: 14),
                 ),
               ],
@@ -92,8 +89,14 @@ class ReceiptWidget extends StatelessWidget {
 
           // 3. ORDER INFO SECTION
           _buildInfoRow('Order ID:', '#${order.id}'),
-          _buildInfoRow('Date:', DateFormat('dd MMM yyyy').format(order.orderDate)),
-          _buildInfoRow('Delivery Date:', DateFormat('dd MMM yyyy').format(order.deliveryDate)),
+          _buildInfoRow(
+            'Date:',
+            DateFormat('dd MMM yyyy').format(order.orderDate),
+          ),
+          _buildInfoRow(
+            'Delivery Date:',
+            DateFormat('dd MMM yyyy').format(order.deliveryDate),
+          ),
           _buildInfoRow('Status:', order.status),
           const SizedBox(height: 12),
           _buildDashedDivider(),
@@ -104,8 +107,14 @@ class ReceiptWidget extends StatelessWidget {
           const SizedBox(height: 8),
           _buildInfoRow('Customer ID:', customer.id),
           _buildInfoRow('Name:', customer.name),
-          _buildInfoRow('Phone:', customer.phone.isNotEmpty ? customer.phone : 'N/A'),
-          _buildInfoRow('Address:', customer.address?.isNotEmpty == true ? customer.address! : 'N/A'),
+          _buildInfoRow(
+            'Phone:',
+            customer.phone.isNotEmpty ? customer.phone : 'N/A',
+          ),
+          _buildInfoRow(
+            'Address:',
+            customer.address?.isNotEmpty == true ? customer.address! : 'N/A',
+          ),
           const SizedBox(height: 12),
           _buildDashedDivider(),
           const SizedBox(height: 12),
@@ -115,7 +124,7 @@ class ReceiptWidget extends StatelessWidget {
           const SizedBox(height: 8),
           _buildInfoRow('Order Type:', order.isAdult ? 'Adult' : 'Child'),
           _buildInfoRow('Quantity:', '${order.quantity}'),
-          _buildInfoRow('Fabric Notes:', order.measurements.extraNotes ?? 'N/A'),
+          _buildInfoRow('Notes:', order.measurements.extraNotes ?? 'N/A'),
           const SizedBox(height: 12),
           _buildDashedDivider(),
           const SizedBox(height: 12),
@@ -149,11 +158,23 @@ class ReceiptWidget extends StatelessWidget {
                 // Divider before Total
                 if (order.subTotal > 0 || order.pricingItems.isNotEmpty)
                   const Divider(color: Colors.white24, height: 16),
-                _buildPaymentRow('Total Amount:', 'PKR ${order.totalAmount.toStringAsFixed(0)}', Colors.white),
+                _buildPaymentRow(
+                  'Total Amount:',
+                  'PKR ${order.totalAmount.toStringAsFixed(0)}',
+                  Colors.white,
+                ),
                 const SizedBox(height: 8),
-                _buildPaymentRow('Advance Paid:', 'PKR ${order.advancePaid.toStringAsFixed(0)}', kAccentColor),
+                _buildPaymentRow(
+                  'Advance Paid:',
+                  'PKR ${order.advancePaid.toStringAsFixed(0)}',
+                  kAccentColor,
+                ),
                 const Divider(color: Colors.white24, height: 16),
-                _buildPaymentRow('Remaining:', 'PKR ${remaining.toStringAsFixed(0)}', kAccentColor),
+                _buildPaymentRow(
+                  'Remaining:',
+                  'PKR ${remaining.toStringAsFixed(0)}',
+                  kAccentColor,
+                ),
               ],
             ),
           ),
@@ -163,8 +184,13 @@ class ReceiptWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
-              color: (isPaid ? kAccentColor : Colors.orange).withValues(alpha: 0.1),
-              border: Border.all(color: isPaid ? kAccentColor : Colors.orange, width: 2),
+              color: (isPaid ? kAccentColor : Colors.orange).withValues(
+                alpha: 0.1,
+              ),
+              border: Border.all(
+                color: isPaid ? kAccentColor : Colors.orange,
+                width: 2,
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -185,7 +211,7 @@ class ReceiptWidget extends StatelessWidget {
           Container(height: 2, width: double.infinity, color: kAccentColor),
           const SizedBox(height: 16),
           Text(
-            'Thank you for your business!',
+            'Thank you for ordering with ${ProfileController().profile?.shopName ?? 'Irfan Tailors'}!',
             style: GoogleFonts.inter(
               color: kTextSecondary,
               fontSize: 14,
@@ -196,7 +222,11 @@ class ReceiptWidget extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Powered by TryUnity Solutions',
-            style: GoogleFonts.inter(color: kTextSecondary, fontSize: 10, fontWeight: FontWeight.bold),
+            style: GoogleFonts.inter(
+              color: kTextSecondary,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 2),
@@ -285,6 +315,7 @@ class ReceiptWidget extends StatelessWidget {
       ],
     );
   }
+
   Widget _buildDashedDivider() {
     return const _DashedLine();
   }

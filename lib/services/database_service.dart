@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/order_model.dart';
 import '../models/customer_model.dart';
+import '../models/family_model.dart';
 import '../models/expense_model.dart';
 import 'firebase_sync_service.dart';
 
@@ -23,7 +24,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 9,
+      version: 11,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -112,6 +113,28 @@ CREATE TABLE IF NOT EXISTS meta (
         await db.execute('ALTER TABLE orders ADD COLUMN pickedUpQuantity INTEGER DEFAULT 0;');
       } catch (_) {}
     }
+    if (oldVersion < 10) {
+      // Add families table
+      try {
+        await db.execute('''
+CREATE TABLE IF NOT EXISTS families (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  createdAt TEXT,
+  updatedAt TEXT
+)
+''');
+      } catch (_) {}
+      // Add familyId column to customers
+      try {
+        await db.execute('ALTER TABLE customers ADD COLUMN familyId TEXT;');
+      } catch (_) {}
+    }
+    if (oldVersion < 11) {
+      try {
+        await db.execute('ALTER TABLE families ADD COLUMN deletedAt TEXT;');
+      } catch (_) {}
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -190,12 +213,88 @@ CREATE TABLE meta (
   value TEXT NOT NULL
 )
 ''');
+
+    await db.execute('''
+CREATE TABLE families (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  createdAt TEXT,
+  updatedAt TEXT,
+  deletedAt TEXT
+)
+''');
   }
 
   Future<void> insertCustomer(CustomerModel customer) async {
     final db = await instance.database;
     await db.insert('customers', customer.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
     FirebaseSyncService.instance.syncCustomer(customer);
+  }
+
+  // ── Family CRUD ────────────────────────────────────────────────────────────
+
+  Future<void> insertFamily(FamilyModel family) async {
+    final db = await instance.database;
+    await db.insert('families', family.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    FirebaseSyncService.instance.syncFamily(family);
+  }
+
+  Future<void> updateFamily(FamilyModel family) async {
+    final db = await instance.database;
+    await db.update('families', family.toMap(), where: 'id = ?', whereArgs: [family.id]);
+    FirebaseSyncService.instance.syncFamily(family);
+  }
+
+  Future<void> deleteFamily(String familyId) async {
+    final db = await instance.database;
+    final now = DateTime.now().toIso8601String();
+    
+    // Unlink all customers from this family
+    final customersToUnlink = await db.query('customers', where: 'familyId = ?', whereArgs: [familyId]);
+    await db.update('customers', {'familyId': null, 'updatedAt': now}, where: 'familyId = ?', whereArgs: [familyId]);
+    
+    // Soft delete the family record
+    await db.update('families', {'deletedAt': now, 'updatedAt': now}, where: 'id = ?', whereArgs: [familyId]);
+    
+    // Sync the deleted family
+    final familyRow = await db.query('families', where: 'id = ?', whereArgs: [familyId]);
+    if (familyRow.isNotEmpty) {
+      FirebaseSyncService.instance.syncFamily(FamilyModel.fromMap(familyRow.first));
+    }
+    
+    // Sync unlinked customers
+    for (var row in customersToUnlink) {
+      final updatedCustomer = CustomerModel.fromMap(row).copyWith(familyId: null, updatedAt: DateTime.parse(now));
+      FirebaseSyncService.instance.syncCustomer(updatedCustomer);
+    }
+  }
+
+  Future<void> purgeFamily(String id) async {
+    final db = await instance.database;
+    await db.delete('families', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<FamilyModel>> getAllFamilies() async {
+    final db = await instance.database;
+    final result = await db.query('families', where: 'deletedAt IS NULL', orderBy: 'name ASC');
+    return result.map((r) => FamilyModel.fromMap(r)).toList();
+  }
+
+  Future<FamilyModel?> getFamilyById(String familyId) async {
+    final db = await instance.database;
+    final result = await db.query('families', where: 'id = ?', whereArgs: [familyId]);
+    if (result.isEmpty) return null;
+    return FamilyModel.fromMap(result.first);
+  }
+
+  Future<List<CustomerModel>> getCustomersByFamilyId(String familyId) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'customers',
+      where: 'familyId = ? AND deletedAt IS NULL',
+      whereArgs: [familyId],
+    );
+    return result.map((r) => CustomerModel.fromMap(r)).toList();
   }
 
   Future<void> updateCustomer(CustomerModel customer) async {

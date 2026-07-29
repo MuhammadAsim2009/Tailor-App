@@ -4,8 +4,11 @@ import 'package:intl/intl.dart';
 
 import '../models/customer_model.dart';
 import '../models/order_model.dart';
+import '../models/family_model.dart';
 import '../controllers/order_controller.dart';
 import '../services/whatsapp_service.dart';
+import '../services/database_service.dart';
+import 'family_receipt_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
@@ -58,6 +61,15 @@ class _CustomersScreenState extends State<CustomersScreen> {
     ).then((_) => _controller.loadData());
   }
 
+  void _showFamiliesSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FamiliesListSheet(controller: _controller),
+    ).then((_) => _controller.loadData());
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -81,6 +93,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
               ),
             ),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.group_outlined, color: kPrimaryColor),
+                tooltip: 'Families',
+                onPressed: () => _showFamiliesSheet(),
+              ),
               IconButton(
                 icon: const Icon(Icons.refresh_outlined, color: kPrimaryColor),
                 onPressed: () => _controller.loadData(),
@@ -327,6 +344,35 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 _buildQtyBadge('$remainingQty Left', Colors.orange.shade50, Colors.orange.shade700),
                             ],
                           ),
+                        ],
+                        if (customer.familyId != null && customer.familyId!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Builder(builder: (context) {
+                            final familyName = _controller.getFamilyName(customer.familyId);
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.family_restroom, size: 12, color: Color(0xFF7C3AED)),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    familyName.isNotEmpty ? familyName : 'Family',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF7C3AED),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                         ],
                       ],
                     ),
@@ -1275,6 +1321,286 @@ class _EditCustomerSheetState extends State<_EditCustomerSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  _FamiliesListSheet
+// ─────────────────────────────────────────────────────────────────
+class _FamiliesListSheet extends StatelessWidget {
+  final OrderController controller;
+  const _FamiliesListSheet({required this.controller});
+
+  void _showCreateFamilyDialog(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: kBgColor,
+          title: Text('Create Family', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimaryColor)),
+          content: TextField(
+            controller: nameCtrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Family Name',
+              hintStyle: GoogleFonts.inter(color: kTextSecondary),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameCtrl.text.trim();
+                if (name.isNotEmpty) {
+                  await controller.createFamily(name);
+                  if (context.mounted) Navigator.pop(context);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kAccentColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: Text('Create', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditFamilyDialog(BuildContext context, FamilyModel family) {
+    final nameCtrl = TextEditingController(text: family.name);
+    // Keep a local copy of members
+    final members = controller.getCustomersByFamilyId(family.id);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: kBgColor,
+              title: Text('Edit Family', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimaryColor)),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Family Name',
+                        labelStyle: GoogleFonts.inter(color: kTextSecondary),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Members', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kTextPrimary)),
+                    const SizedBox(height: 8),
+                    if (members.isEmpty)
+                      Text('No members in this family.', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 13))
+                    else
+                      Flexible(
+                        child: ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: members.length,
+                          itemBuilder: (context, index) {
+                            final customer = members[index];
+                            final isActive = customer.familyId == family.id;
+                            return SwitchListTile(
+                              title: Text(customer.name, style: GoogleFonts.inter(fontSize: 14)),
+                              value: isActive,
+                              activeColor: kAccentColor,
+                              onChanged: (val) {
+                                setState(() {
+                                  final updated = customer.copyWith(familyId: val ? family.id : null, clearFamilyId: !val);
+                                  members[index] = updated;
+                                  controller.updateCustomer(updated);
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Close', style: GoogleFonts.inter(color: kTextSecondary)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    if (name.isNotEmpty && name != family.name) {
+                      await controller.updateFamily(family.copyWith(name: name));
+                    }
+                    if (context.mounted) Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kAccentColor,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: Text('Save Name', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final families = controller.families;
+    return Container(
+      decoration: const BoxDecoration(
+        color: kBgColor,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).padding.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Families',
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: kPrimaryColor,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => _showCreateFamilyDialog(context),
+                  icon: const Icon(Icons.add, color: kAccentColor),
+                  label: Text(
+                    'Create',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      color: kAccentColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (families.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'No families created yet.\nYou can create a family here or when adding a customer.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(color: kTextSecondary),
+              ),
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                itemCount: families.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final family = families[index];
+                  final members = controller.getCustomersByFamilyId(family.id);
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: kCardColor,
+                      borderRadius: BorderRadius.circular(kRadius),
+                      boxShadow: [
+                        BoxShadow(
+                          color: kTextPrimary.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.15),
+                        child: const Icon(Icons.family_restroom, color: Color(0xFF7C3AED)),
+                      ),
+                      title: Text(
+                        family.name,
+                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kTextPrimary),
+                      ),
+                      subtitle: Text(
+                        '${members.length} member${members.length == 1 ? '' : 's'}',
+                        style: GoogleFonts.inter(fontSize: 13, color: kTextSecondary),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, color: kTextSecondary),
+                            onPressed: () => _showEditFamilyDialog(context, family),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FamilyReceiptScreen(
+                                    family: family,
+                                    controller: controller,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kPrimaryColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            ),
+                            child: Text(
+                              'Receipt',
+                              style: GoogleFonts.inter(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

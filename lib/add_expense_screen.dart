@@ -7,28 +7,13 @@ import '../controllers/expense_controller.dart';
 // ─────────────────────────────────────────────────────────────────
 //  Design System Constants
 // ─────────────────────────────────────────────────────────────────
-const Color _kPrimary  = Color(0xFF1E3A5F);
-const Color _kAccent   = Color(0xFF10B981);
-const Color _kBg       = Color(0xFFF8FAFC);
-const Color _kCard     = Color(0xFFFFFFFF);
-const Color _kTextPri  = Color(0xFF0F172A);
-const Color _kTextSec  = Color(0xFF64748B);
-const double _kR       = 16.0;
-
-// ─────────────────────────────────────────────────────────────────
-//  Expense Category Model
-// ─────────────────────────────────────────────────────────────────
-class _Category {
-  final String name;
-  final IconData icon;
-  final Color color;
-
-  const _Category({
-    required this.name,
-    required this.icon,
-    required this.color,
-  });
-}
+const Color _kPrimary = Color(0xFF1E3A5F);
+const Color _kAccent = Color(0xFF10B981);
+const Color _kBg = Color(0xFFF8FAFC);
+const Color _kCard = Color(0xFFFFFFFF);
+const Color _kTextPri = Color(0xFF0F172A);
+const Color _kTextSec = Color(0xFF64748B);
+const double _kR = 16.0;
 
 // ─────────────────────────────────────────────────────────────────
 //  AddExpenseScreen
@@ -41,22 +26,10 @@ class AddExpenseScreen extends StatefulWidget {
 }
 
 class _AddExpenseScreenState extends State<AddExpenseScreen> {
-  // ── Category Selection ──
-  int? _selectedCategoryIndex;
-
-  final List<_Category> _categories = const [
-    _Category(name: 'Rent',        icon: Icons.home_outlined,          color: Color(0xFF3B82F6)),
-    _Category(name: 'Electricity', icon: Icons.bolt_outlined,          color: Color(0xFFEAB308)),
-    _Category(name: 'Material',    icon: Icons.content_cut_outlined,   color: Color(0xFF8B5CF6)),
-    _Category(name: 'Salary',      icon: Icons.person_outline,         color: Color(0xFFF97316)),
-    _Category(name: 'Maintenance', icon: Icons.build_outlined,         color: Color(0xFFEF4444)),
-    _Category(name: 'Other',       icon: Icons.category_outlined,      color: Color(0xFF64748B)),
-  ];
-
   // ── Form Controllers ──
-  final TextEditingController _titleCtrl  = TextEditingController();
+  final TextEditingController _titleCtrl = TextEditingController();
   final TextEditingController _amountCtrl = TextEditingController();
-  final TextEditingController _notesCtrl  = TextEditingController();
+  final TextEditingController _notesCtrl = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
   final ExpenseController _controller = ExpenseController();
@@ -64,7 +37,6 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   @override
   void initState() {
     super.initState();
-    // Rebuild when title or amount changes (drives _canSave + amount display)
     _amountCtrl.addListener(() => setState(() {}));
     _titleCtrl.addListener(() => setState(() {}));
   }
@@ -80,10 +52,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   // ── Computed Properties ──
   double get _parsedAmount => double.tryParse(_amountCtrl.text) ?? 0.0;
 
-  bool get _canSave =>
-      _selectedCategoryIndex != null &&
-      _titleCtrl.text.trim().isNotEmpty &&
-      _parsedAmount > 0;
+  bool get _canSave => _titleCtrl.text.trim().isNotEmpty && _parsedAmount > 0;
 
   // ── Pick Date ──
   Future<void> _pickDate() async {
@@ -108,13 +77,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
   // ── Save Expense ──
   void _saveExpense() async {
-    if (!_canSave || _selectedCategoryIndex == null) return;
-    
-    final categoryName = _categories[_selectedCategoryIndex!].name;
-    
+    if (!_canSave) return;
+
     await _controller.addExpense(
       title: _titleCtrl.text.trim(),
-      category: categoryName,
+      category: '',
       amount: _parsedAmount,
       date: _selectedDate,
       notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
@@ -123,16 +90,18 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
     if (mounted) {
       Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Expense saved: PKR ${_parsedAmount.toStringAsFixed(0)}',
-          style: GoogleFonts.inter(color: Colors.white),
+        SnackBar(
+          content: Text(
+            'Expense saved: PKR ${_parsedAmount.toStringAsFixed(0)}',
+            style: GoogleFonts.inter(color: Colors.white),
+          ),
+          backgroundColor: _kAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
-        backgroundColor: _kAccent,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+      );
     }
   }
 
@@ -150,20 +119,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── 1. Category Selector ──
-            _buildSectionCard(
-              title: 'Category',
-              child: _buildCategoryGrid(),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── 2. Prominent Amount Display ──
+            // ── 1. Prominent Amount Display ──
             _buildAmountDisplay(),
 
             const SizedBox(height: 20),
 
-            // ── 3. Expense Details ──
+            // ── 2. Expense Details ──
             _buildSectionCard(
               title: 'Expense Details',
               child: _buildDetailsForm(),
@@ -171,7 +132,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
 
             const SizedBox(height: 32),
 
-            // ── 4. Save Button ──
+            // ── 3. Save Button ──
             _buildSaveButton(),
           ],
         ),
@@ -188,8 +149,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_outlined,
-            color: _kPrimary, size: 20),
+        icon: const Icon(
+          Icons.arrow_back_ios_new_outlined,
+          color: _kPrimary,
+          size: 20,
+        ),
         onPressed: () => Navigator.maybePop(context),
       ),
       title: Text(
@@ -244,123 +208,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  //  Category Grid (3 × 2)
-  // ─────────────────────────────────────────────────────────────────
-  Widget _buildCategoryGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.92,
-      ),
-      itemCount: _categories.length,
-      itemBuilder: (context, i) {
-        final cat        = _categories[i];
-        final isSelected = _selectedCategoryIndex == i;
-
-        return Material(
-          // Material ensures InkWell splash works + proper hit testing
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(_kR),
-          child: InkWell(
-            onTap: () => setState(() => _selectedCategoryIndex = i),
-            borderRadius: BorderRadius.circular(_kR),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeInOut,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? _kAccent.withValues(alpha: 0.07)
-                    : _kBg,
-                borderRadius: BorderRadius.circular(_kR),
-                border: Border.all(
-                  color: isSelected ? _kAccent : Colors.grey.shade200,
-                  width: isSelected ? 2 : 1,
-                ),
-                boxShadow: [
-                  if (!isSelected)
-                    BoxShadow(
-                      color: _kTextPri.withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // ── Main content (rendered first = behind) ──
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isSelected
-                                ? cat.color.withValues(alpha: 0.15)
-                                : cat.color.withValues(alpha: 0.1),
-                          ),
-                          child: Icon(cat.icon, color: cat.color, size: 24),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          cat.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: isSelected ? _kPrimary : _kTextSec,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Checkmark badge (rendered last = on top) ──
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: AnimatedScale(
-                      scale: isSelected ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutBack,
-                      child: Container(
-                        width: 18,
-                        height: 18,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _kAccent,
-                        ),
-                        child: const Icon(Icons.check,
-                            color: Colors.white, size: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────
   //  Prominent Amount Display
   // ─────────────────────────────────────────────────────────────────
   Widget _buildAmountDisplay() {
     final hasAmount = _parsedAmount > 0;
-    final cat = _selectedCategoryIndex != null
-        ? _categories[_selectedCategoryIndex!]
-        : null;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
@@ -379,49 +230,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
       ),
       child: Column(
         children: [
-          // Category label chip
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: cat != null
-                ? Container(
-                    key: ValueKey(cat.name),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: cat.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: cat.color.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(cat.icon, color: cat.color, size: 14),
-                        const SizedBox(width: 6),
-                        Text(
-                          cat.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: cat.color,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Text(
-                    key: const ValueKey('placeholder'),
-                    'Select a category above',
-                    style: GoogleFonts.inter(
-                        fontSize: 13, color: _kTextSec),
-                  ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Large amount — using AnimatedScale instead of ScaleTransition
-          // (ScaleTransition during animation frame 0 could briefly
-          //  make the widget invisible and prevent touch events)
+          // Large amount
           AnimatedScale(
             scale: 1.0,
             duration: const Duration(milliseconds: 200),
@@ -435,9 +244,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   style: GoogleFonts.inter(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: hasAmount
-                        ? const Color(0xFFEF4444)
-                        : _kTextSec,
+                    color: hasAmount ? const Color(0xFFEF4444) : _kTextSec,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -446,14 +253,10 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                   style: GoogleFonts.inter(
                     fontSize: hasAmount ? 44 : 36,
                     fontWeight: FontWeight.bold,
-                    color: hasAmount
-                        ? const Color(0xFFEF4444)
-                        : _kTextSec,
+                    color: hasAmount ? const Color(0xFFEF4444) : _kTextSec,
                   ),
                   child: Text(
-                    hasAmount
-                        ? _parsedAmount.toStringAsFixed(0)
-                        : '0',
+                    hasAmount ? _parsedAmount.toStringAsFixed(0) : '0',
                   ),
                 ),
               ],
@@ -464,8 +267,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
             const SizedBox(height: 8),
             Text(
               'will be recorded as expense',
-              style: GoogleFonts.inter(
-                  fontSize: 12, color: _kTextSec),
+              style: GoogleFonts.inter(fontSize: 12, color: _kTextSec),
             ),
           ],
         ],
@@ -546,8 +348,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.calendar_today_outlined,
-                color: _kTextSec, size: 20),
+            const Icon(
+              Icons.calendar_today_outlined,
+              color: _kTextSec,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -555,8 +360,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 children: [
                   Text(
                     'Date',
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: _kTextSec),
+                    style: GoogleFonts.inter(fontSize: 12, color: _kTextSec),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -570,8 +374,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_outlined,
-                color: Colors.grey.shade400, size: 20),
+            Icon(
+              Icons.chevron_right_outlined,
+              color: Colors.grey.shade400,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -679,8 +486,11 @@ class _ExpenseInputFieldState extends State<_ExpenseInputField> {
             fontSize: 13,
           ),
           hintStyle: GoogleFonts.inter(color: _kTextSec, fontSize: 13),
-          prefixIcon: Icon(widget.icon,
-              color: _focused ? _kAccent : _kTextSec, size: 20),
+          prefixIcon: Icon(
+            widget.icon,
+            color: _focused ? _kAccent : _kTextSec,
+            size: 20,
+          ),
           prefix: widget.prefix,
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(_kR),
@@ -696,8 +506,10 @@ class _ExpenseInputFieldState extends State<_ExpenseInputField> {
           ),
           filled: true,
           fillColor: _focused ? _kAccent.withValues(alpha: 0.02) : _kCard,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../models/customer_model.dart';
 import '../models/order_model.dart';
 import '../models/expense_model.dart';
+import '../models/family_model.dart';
 import '../models/profile_model.dart';
 import '../controllers/order_controller.dart';
 import '../controllers/expense_controller.dart';
@@ -81,6 +82,26 @@ class FirebaseSyncService extends ChangeNotifier {
         _finishOp();
       }).catchError((e) {
         log('Error syncing customer: $e');
+        _finishOp(error: true);
+      });
+    }
+  }
+
+  void syncFamily(FamilyModel family) {
+    _startOp();
+    if (family.deletedAt != null) {
+      _firestore.collection('families').doc(family.id).delete().then((_) {
+        DatabaseService.instance.purgeFamily(family.id);
+        _finishOp();
+      }).catchError((e) {
+        log('Error deleting family from firestore: $e');
+        _finishOp(error: true);
+      });
+    } else {
+      _firestore.collection('families').doc(family.id).set(family.toFirestore()).then((_) {
+        _finishOp();
+      }).catchError((e) {
+        log('Error syncing family: $e');
         _finishOp(error: true);
       });
     }
@@ -177,21 +198,24 @@ class FirebaseSyncService extends ChangeNotifier {
       int cloudOrdersCount = 0;
       int cloudCustomersCount = 0;
       int cloudExpensesCount = 0;
+      int cloudFamiliesCount = 0;
       
       if (metaDoc.exists) {
         final data = metaDoc.data()!;
         cloudOrdersCount = data['ordersCount'] ?? 0;
         cloudCustomersCount = data['customersCount'] ?? 0;
         cloudExpensesCount = data['expensesCount'] ?? 0;
+        cloudFamiliesCount = data['familiesCount'] ?? 0;
       }
 
       final localCustomersCount = (await dbService.getAllCustomers()).length;
       final localOrdersCount = (await dbService.getAllOrders()).length;
       final localExpensesCount = (await dbService.getExpenses()).length;
+      final localFamiliesCount = (await dbService.getAllFamilies()).length;
 
       log('--- Richness Check ---');
-      log('Local DB  -> Customers: $localCustomersCount | Orders: $localOrdersCount | Expenses: $localExpensesCount');
-      log('Firebase  -> Customers: $cloudCustomersCount | Orders: $cloudOrdersCount | Expenses: $cloudExpensesCount');
+      log('Local DB  -> Customers: $localCustomersCount | Orders: $localOrdersCount | Expenses: $localExpensesCount | Families: $localFamiliesCount');
+      log('Firebase  -> Customers: $cloudCustomersCount | Orders: $cloudOrdersCount | Expenses: $cloudExpensesCount | Families: $cloudFamiliesCount');
       
       if (localOrdersCount == 0 && cloudOrdersCount > 0) {
         log('Condition met: SQLite local DB is empty/deleted, Firebase is richer. Pulling all data from Firebase.');
@@ -209,6 +233,7 @@ class FirebaseSyncService extends ChangeNotifier {
       await _syncCustomersCollection(dbService, sqldb, lastSyncAt);
       await _syncOrdersCollection(dbService, sqldb, lastSyncAt);
       await _syncExpensesCollection(dbService, sqldb, lastSyncAt);
+      await _syncFamiliesCollection(dbService, sqldb, lastSyncAt);
 
       await dbService.saveLastSyncAt(syncStartedAt);
 
@@ -218,6 +243,7 @@ class FirebaseSyncService extends ChangeNotifier {
         'customersCount': (await dbService.getAllCustomers()).length,
         'ordersCount': (await dbService.getAllOrders()).length,
         'expensesCount': (await dbService.getExpenses()).length,
+        'familiesCount': (await dbService.getAllFamilies()).length,
         'globalLastUpdatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -254,30 +280,38 @@ class FirebaseSyncService extends ChangeNotifier {
       final customersSnap = await _firestore.collection('customers').get();
       final ordersSnap = await _firestore.collection('orders').get();
       final expensesSnap = await _firestore.collection('expenses').get();
+      final familiesSnap = await _firestore.collection('families').get();
 
       log('--- FORCE PULL: Wiping local SQLite tables ---');
-      await sqldb.delete('profile');
-      await sqldb.delete('customers');
-      await sqldb.delete('orders');
-      await sqldb.delete('expenses');
-
-      log('--- FORCE PULL: Inserting Firebase data into SQLite ---');
-      if (profileSnap.docs.isNotEmpty) {
-        final profile = ProfileModel.fromFirestore(profileSnap.docs.first.data());
-        await sqldb.insert('profile', profile.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-      for (var doc in customersSnap.docs) {
-        final customer = CustomerModel.fromFirestore(doc.data());
-        await sqldb.insert('customers', customer.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-      for (var doc in ordersSnap.docs) {
-        final order = OrderModel.fromFirestore(doc.data());
-        await sqldb.insert('orders', order.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-      }
-      for (var doc in expensesSnap.docs) {
-        final expense = ExpenseModel.fromFirestore(doc.data());
-        await sqldb.insert('expenses', expense.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-      }
+      await sqldb.transaction((txn) async {
+        await txn.delete('profile');
+        await txn.delete('customers');
+        await txn.delete('orders');
+        await txn.delete('expenses');
+        await txn.delete('families');
+        
+        log('--- FORCE PULL: Inserting Firebase data into SQLite ---');
+        if (profileSnap.docs.isNotEmpty) {
+          final profile = ProfileModel.fromFirestore(profileSnap.docs.first.data());
+          await txn.insert('profile', profile.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        for (var doc in customersSnap.docs) {
+          final customer = CustomerModel.fromFirestore(doc.data());
+          await txn.insert('customers', customer.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        for (var doc in ordersSnap.docs) {
+          final order = OrderModel.fromFirestore(doc.data());
+          await txn.insert('orders', order.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        for (var doc in expensesSnap.docs) {
+          final expense = ExpenseModel.fromFirestore(doc.data());
+          await txn.insert('expenses', expense.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        for (var doc in familiesSnap.docs) {
+          final family = FamilyModel.fromFirestore(doc.data());
+          await txn.insert('families', family.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+      });
 
       await dbService.saveLastSyncAt(DateTime.now());
 
@@ -384,6 +418,58 @@ class FirebaseSyncService extends ChangeNotifier {
         }
       } catch (e) {
         log('Failed to sync customer $id: $e');
+      }
+    }
+  }
+
+  Future<void> _syncFamiliesCollection(
+      DatabaseService dbService, Database sqldb, DateTime? lastSyncAt) async {
+    final cloudSnapshot = await _firestore.collection('families').get();
+    final localRecords = await dbService.getAllFamilies();
+
+    final cloudMap = {for (var doc in cloudSnapshot.docs) doc.id: FamilyModel.fromFirestore(doc.data())};
+    final localMap = {for (var record in localRecords) record.id: record};
+
+    final allIds = <String>{...cloudMap.keys, ...localMap.keys};
+
+    for (final id in allIds) {
+      try {
+        final cloud = cloudMap[id];
+        final local = localMap[id];
+
+        if (cloud != null && local != null) {
+          final takeCloud = _cloudWins(cloud.updatedAt, local.updatedAt, lastSyncAt);
+          final winner = takeCloud ? cloud : local;
+
+          if (takeCloud) {
+            log('Family $id: pulling from cloud');
+            await sqldb.update('families', cloud.toMap(), where: 'id = ?', whereArgs: [id]);
+          } else {
+            log('Family $id: pushing local to cloud');
+            await _firestore.collection('families').doc(id).set(local.toFirestore());
+          }
+
+          if (winner.deletedAt != null) {
+            await _firestore.collection('families').doc(id).delete();
+            await dbService.purgeFamily(id);
+          }
+        } else if (cloud != null && local == null) {
+          if (cloud.deletedAt == null) {
+            log('Family $id: new from cloud, inserting locally');
+            await sqldb.insert('families', cloud.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+          } else {
+            await _firestore.collection('families').doc(id).delete();
+          }
+        } else if (cloud == null && local != null) {
+          if (local.deletedAt == null) {
+            log('Family $id: local only, pushing to cloud');
+            await _firestore.collection('families').doc(id).set(local.toFirestore());
+          } else {
+            await dbService.purgeFamily(id);
+          }
+        }
+      } catch (e) {
+        log('Failed to sync family $id: $e');
       }
     }
   }

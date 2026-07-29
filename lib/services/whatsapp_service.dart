@@ -80,6 +80,21 @@ class WhatsAppService {
     return sendTextMessage(phoneNumber: phoneNumber, message: message);
   }
 
+  /// Sends a pickup reminder — tells customer how many pieces remain to collect
+  static Future<bool> sendPickupReminder({
+    required String phoneNumber,
+    required String customerName,
+    required String orderId,
+    required int remainingPickup,
+    required int totalQuantity,
+  }) async {
+    final shopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
+    final message = "Dear $customerName! This is a friendly reminder from $shopName. "
+        "Your order has $remainingPickup piece${remainingPickup == 1 ? '' : 's'} remaining to be picked up out of $totalQuantity. "
+        "Please visit us at your earliest convenience to collect your order. Thank you!";
+    return sendTextMessage(phoneNumber: phoneNumber, message: message);
+  }
+
   /// Sends generic payment reminder text
   static Future<bool> sendGeneralPaymentReminder({
     required String phoneNumber,
@@ -93,20 +108,15 @@ class WhatsAppService {
     return sendTextMessage(phoneNumber: phoneNumber, message: message);
   }
 
-  /// Builds the new order confirmation message string
   static String buildNewOrderMessage({
     required String customerName,
     required String orderId,
     required double totalAmount,
     required double advancePaid,
   }) {
-    final remainingAmount = totalAmount - advancePaid;
     final shopName = ProfileController().profile?.shopName ?? 'Irfan Tailors';
     return "Dear $customerName!\n"
         "Thank you for placing your order with $shopName.\n"
-        "Total amount: Rs. ${totalAmount.toStringAsFixed(0)}\n"
-        "Advance paid: Rs. ${advancePaid.toStringAsFixed(0)}\n"
-        "Remaining balance: Rs. ${remainingAmount.toStringAsFixed(0)}\n"
         "We'll notify you once it's ready!";
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/order_model.dart';
 import '../models/customer_model.dart';
+import '../models/family_model.dart';
 import '../services/database_service.dart';
 
 class OrderController extends ChangeNotifier {
@@ -9,6 +10,7 @@ class OrderController extends ChangeNotifier {
 
   List<CustomerModel> customers = [];
   List<OrderModel> orders = [];
+  List<FamilyModel> families = [];
 
   bool isLoading = false;
 
@@ -27,6 +29,7 @@ class OrderController extends ChangeNotifier {
     try {
       customers = await _dbService.getAllCustomers();
       orders = await _dbService.getAllOrders();
+      families = await _dbService.getAllFamilies();
     } catch (e) {
       if (kDebugMode) {
         print('Error loading data: $e');
@@ -59,6 +62,33 @@ class OrderController extends ChangeNotifier {
     return null;
   }
 
+  /// Returns the FamilyModel for a given familyId, or null.
+  FamilyModel? getFamilyById(String familyId) {
+    for (var f in families) {
+      if (f.id == familyId) return f;
+    }
+    return null;
+  }
+
+  /// Returns the family name for a given familyId, or empty string.
+  String getFamilyName(String? familyId) {
+    if (familyId == null || familyId.isEmpty) return '';
+    return getFamilyById(familyId)?.name ?? '';
+  }
+
+  /// Returns all customers belonging to a given familyId.
+  List<CustomerModel> getCustomersByFamilyId(String familyId) {
+    return customers.where((c) => c.familyId == familyId).toList();
+  }
+
+  /// Returns all orders for a given customerId.
+  List<OrderModel> getOrdersByCustomerId(String customerId) {
+    return orders.where((o) => o.customerId == customerId).toList();
+  }
+
+  /// Generate a next family ID (numeric like customers/orders).
+  String get nextFamilyId => generateNextId(families.map((f) => f.id));
+
   String generateNextId(Iterable<String> existingIds) {
     int maxId = 100;
     for (var idStr in existingIds) {
@@ -86,6 +116,7 @@ class OrderController extends ChangeNotifier {
               address: customer.address,
               measurements: order.measurements,
               updatedAt: DateTime.now(),
+              familyId: customer.familyId,
             )
           : CustomerModel(
               id: customer.id,
@@ -94,6 +125,7 @@ class OrderController extends ChangeNotifier {
               address: customer.address,
               measurements: order.measurements,
               updatedAt: DateTime.now(),
+              familyId: customer.familyId,
             );
 
       await _dbService.insertCustomer(customerToSave);
@@ -126,6 +158,32 @@ class OrderController extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) {
         print('Error adding order: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<String> createFamily(String name) async {
+    try {
+      final family = FamilyModel(id: nextFamilyId, name: name, createdAt: DateTime.now());
+      await _dbService.insertFamily(family);
+      await loadData();
+      return family.id;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error creating family: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateFamily(FamilyModel family) async {
+    try {
+      await _dbService.updateFamily(family);
+      await loadData();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating family: $e');
       }
       rethrow;
     }

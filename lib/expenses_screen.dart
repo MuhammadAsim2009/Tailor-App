@@ -76,15 +76,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     _animController.forward();
   }
 
-  // ── Category emoji/icon helper ──
-  String _getCategoryEmoji(String cat) {
-    if (cat.contains('Rent'))        return '🏠';
-    if (cat.contains('Electricity')) return '⚡';
-    if (cat.contains('Material'))    return '🧵';
-    if (cat.contains('Salary'))      return '👤';
-    if (cat.contains('Maintenance')) return '🔧';
-    return '📦';
-  }
+
 
 
   // ── Navigate to Edit Expense screen ──
@@ -623,11 +615,8 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
             onTap: () => _showExpenseDetail(exp),
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: CircleAvatar(
-              backgroundColor: _getCategoryColor(exp.category).withValues(alpha: 0.1),
-              child: Text(
-                _getCategoryEmoji(exp.category),
-                style: const TextStyle(fontSize: 20),
-              ),
+              backgroundColor: kAccent.withValues(alpha: 0.1),
+              child: const Icon(Icons.receipt_long_outlined, color: kAccent, size: 20),
             ),
             title: Text(
               exp.title,
@@ -637,11 +626,6 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 4),
-                Text(
-                  exp.category,
-                  style: GoogleFonts.inter(fontSize: 12, color: kTextSec),
-                ),
-                const SizedBox(height: 2),
                 Text(
                   DateFormat('dd MMM yyyy').format(exp.date),
                   style: GoogleFonts.inter(fontSize: 11, color: kTextSec),
@@ -680,14 +664,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
     );
   }
 
-  Color _getCategoryColor(String cat) {
-    if (cat.contains('Rent'))        return const Color(0xFF3B82F6);
-    if (cat.contains('Electricity')) return const Color(0xFFEAB308);
-    if (cat.contains('Material'))    return const Color(0xFF8B5CF6);
-    if (cat.contains('Salary'))      return const Color(0xFFF97316);
-    if (cat.contains('Maintenance')) return const Color(0xFFEF4444);
-    return Colors.grey;
-  }
+
 }
 
 
@@ -711,7 +688,7 @@ class _AnimatedStat extends StatelessWidget {
           duration: const Duration(seconds: 1),
           curve: Curves.easeOutCubic,
           builder: (context, val, child) {
-            String formatted = NumberFormat.compact().format(val);
+            String formatted = NumberFormat('#,###').format(val.toInt());
             return Text(
               formatted,
               style: GoogleFonts.inter(
@@ -872,15 +849,6 @@ class _ExpenseDetailSheet extends StatelessWidget {
 
   const _ExpenseDetailSheet({required this.expense, required this.onEdit});
 
-  static String _emoji(String cat) {
-    if (cat.contains('Rent'))        return '🏠';
-    if (cat.contains('Electricity')) return '⚡';
-    if (cat.contains('Material'))    return '🧵';
-    if (cat.contains('Salary'))      return '👤';
-    if (cat.contains('Maintenance')) return '🔧';
-    return '📦';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -900,8 +868,8 @@ class _ExpenseDetailSheet extends StatelessWidget {
           const SizedBox(height: 24),
           CircleAvatar(
             radius: 32,
-            backgroundColor: Colors.grey.shade100,
-            child: Text(_emoji(expense.category), style: const TextStyle(fontSize: 28)),
+            backgroundColor: kAccent.withValues(alpha: 0.1),
+            child: const Icon(Icons.receipt_long_outlined, color: kAccent, size: 32),
           ),
           const SizedBox(height: 16),
           Text(
@@ -912,18 +880,6 @@ class _ExpenseDetailSheet extends StatelessWidget {
           Text(
             'PKR ${NumberFormat('#,###').format(expense.amount)}',
             style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.red.shade500),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              expense.category,
-              style: GoogleFonts.inter(fontWeight: FontWeight.w500, color: kTextSec),
-            ),
           ),
           const SizedBox(height: 16),
           Row(
@@ -1078,8 +1034,8 @@ class _DeleteConfirmationDialog extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 20,
-                      backgroundColor: Colors.white,
-                      child: Text(_ExpenseDetailSheet._emoji(expense.category), style: const TextStyle(fontSize: 18)),
+                      backgroundColor: kAccent.withValues(alpha: 0.1),
+                      child: const Icon(Icons.receipt_long_outlined, color: kAccent, size: 18),
                     ),
                     const SizedBox(width: 12),
                     Expanded(

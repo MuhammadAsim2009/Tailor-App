@@ -18,24 +18,13 @@ const Color _kRed      = Color(0xFFEF4444);
 const double _kR       = 16.0;
 
 // ─────────────────────────────────────────────────────────────────
-//  Expense Category Model (mirrors AddExpenseScreen)
-// ─────────────────────────────────────────────────────────────────
-class _ECategory {
-  final String name;
-  final IconData icon;
-  final Color color;
-  const _ECategory({required this.name, required this.icon, required this.color});
-}
-
-// ─────────────────────────────────────────────────────────────────
 //  EditExpenseScreen
 // ─────────────────────────────────────────────────────────────────
 class EditExpenseScreen extends StatefulWidget {
-  /// The expense being edited. All fields are pre-filled from this.
   final String  expenseId;
   final String  expenseTitle;
   final double  expenseAmount;
-  final String  expenseCategory; // e.g. "🏠 Rent"
+  final String  expenseCategory;
   final DateTime expenseDate;
   final String  expenseNotes;
 
@@ -54,40 +43,24 @@ class EditExpenseScreen extends StatefulWidget {
 }
 
 class _EditExpenseScreenState extends State<EditExpenseScreen> {
-  // ── Category list ──
-  final List<_ECategory> _categories = const [
-    _ECategory(name: 'Rent',        icon: Icons.home_outlined,           color: Color(0xFF3B82F6)),
-    _ECategory(name: 'Electricity', icon: Icons.bolt_outlined,           color: Color(0xFFEAB308)),
-    _ECategory(name: 'Material',    icon: Icons.content_cut_outlined,    color: Color(0xFF8B5CF6)),
-    _ECategory(name: 'Salary',      icon: Icons.person_outline,          color: Color(0xFFF97316)),
-    _ECategory(name: 'Maintenance', icon: Icons.build_outlined,          color: Color(0xFFEF4444)),
-    _ECategory(name: 'Other',       icon: Icons.category_outlined,       color: Color(0xFF64748B)),
-  ];
-
-  late int?     _selectedCategoryIndex;
   late DateTime _selectedDate;
 
   // ── Form controllers — pre-filled with existing data ──
   late final TextEditingController _titleCtrl;
   late final TextEditingController _amountCtrl;
   late final TextEditingController _notesCtrl;
-  
+
   final ExpenseController _controller = ExpenseController();
 
   @override
   void initState() {
     super.initState();
 
-    // Pre-fill controllers with the passed-in expense data
     _titleCtrl  = TextEditingController(text: widget.expenseTitle);
     _amountCtrl = TextEditingController(text: widget.expenseAmount.toStringAsFixed(0));
     _notesCtrl  = TextEditingController(text: widget.expenseNotes);
     _selectedDate = widget.expenseDate;
 
-    // Resolve which category index matches the passed category string
-    _selectedCategoryIndex = _resolveCategoryIndex(widget.expenseCategory);
-
-    // Rebuild on text change (drives amount display + save button)
     _amountCtrl.addListener(() => setState(() {}));
     _titleCtrl.addListener(() => setState(() {}));
   }
@@ -100,23 +73,10 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
     super.dispose();
   }
 
-  // ── Map incoming emoji-category string to a grid index ──
-  int? _resolveCategoryIndex(String cat) {
-    final lower = cat.toLowerCase();
-    if (lower.contains('rent'))        return 0;
-    if (lower.contains('electricity')) return 1;
-    if (lower.contains('material'))    return 2;
-    if (lower.contains('salary'))      return 3;
-    if (lower.contains('maintenance')) return 4;
-    if (lower.contains('other'))       return 5;
-    return null;
-  }
-
   // ── Computed helpers ──
   double get _parsedAmount => double.tryParse(_amountCtrl.text) ?? 0.0;
 
   bool get _canSave =>
-      _selectedCategoryIndex != null &&
       _titleCtrl.text.trim().isNotEmpty &&
       _parsedAmount > 0;
 
@@ -150,18 +110,17 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
       builder: (_) => _SaveConfirmationSheet(
         onConfirm: () async {
           Navigator.pop(context); // close sheet
-          
-          final categoryName = _categories[_selectedCategoryIndex!].name;
+
           final updatedExpense = ExpenseModel(
             id: widget.expenseId,
             title: _titleCtrl.text.trim(),
-            category: categoryName,
+            category: widget.expenseCategory, // preserve existing category
             amount: _parsedAmount,
             date: _selectedDate,
             notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
           );
           await _controller.updateExpense(updatedExpense);
-          
+
           if (mounted) {
             Navigator.pop(context, true); // close edit screen
             ScaffoldMessenger.of(context).showSnackBar(
@@ -199,20 +158,12 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── 1. Category Selector ──
-              _buildSectionCard(
-                title: 'Category',
-                child: _buildCategoryGrid(),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ── 2. Prominent Amount Display ──
+              // ── 1. Prominent Amount Display ──
               _buildAmountDisplay(),
 
               const SizedBox(height: 20),
 
-              // ── 3. Expense Details ──
+              // ── 2. Expense Details ──
               _buildSectionCard(
                 title: 'Expense Details',
                 child: _buildDetailsForm(),
@@ -220,7 +171,7 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
 
               const SizedBox(height: 32),
 
-              // ── 4. Bottom Buttons ──
+              // ── 3. Bottom Buttons ──
               _buildBottomButtons(),
             ],
           ),
@@ -293,117 +244,10 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
   }
 
   // ─────────────────────────────────────────────────────────────────
-  //  Category Grid (3 × 2) — pre-selected from existing data
-  // ─────────────────────────────────────────────────────────────────
-  Widget _buildCategoryGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.92,
-      ),
-      itemCount: _categories.length,
-      itemBuilder: (context, i) {
-        final cat        = _categories[i];
-        final isSelected = _selectedCategoryIndex == i;
-
-        return Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(_kR),
-          child: InkWell(
-            onTap: () => setState(() => _selectedCategoryIndex = i),
-            borderRadius: BorderRadius.circular(_kR),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeInOut,
-              decoration: BoxDecoration(
-                color: isSelected ? _kAccent.withValues(alpha: 0.07) : _kBg,
-                borderRadius: BorderRadius.circular(_kR),
-                border: Border.all(
-                  color: isSelected ? _kAccent : Colors.grey.shade200,
-                  width: isSelected ? 2 : 1,
-                ),
-                boxShadow: [
-                  if (!isSelected)
-                    BoxShadow(
-                      color: _kTextPri.withValues(alpha: 0.04),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  // ── Main content ──
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isSelected
-                                ? cat.color.withValues(alpha: 0.15)
-                                : cat.color.withValues(alpha: 0.1),
-                          ),
-                          child: Icon(cat.icon, color: cat.color, size: 24),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          cat.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            color: isSelected ? _kPrimary : _kTextSec,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Checkmark badge on top ──
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: AnimatedScale(
-                      scale: isSelected ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutBack,
-                      child: Container(
-                        width: 18,
-                        height: 18,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: _kAccent,
-                        ),
-                        child: const Icon(Icons.check, color: Colors.white, size: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────
   //  Prominent Amount Display — live update as user types
   // ─────────────────────────────────────────────────────────────────
   Widget _buildAmountDisplay() {
     final hasAmount = _parsedAmount > 0;
-    final cat = _selectedCategoryIndex != null
-        ? _categories[_selectedCategoryIndex!]
-        : null;
 
     return Container(
       width: double.infinity,
@@ -421,43 +265,6 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
       ),
       child: Column(
         children: [
-          // Category chip
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            child: cat != null
-                ? Container(
-                    key: ValueKey(cat.name),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: cat.color.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: cat.color.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(cat.icon, color: cat.color, size: 14),
-                        const SizedBox(width: 6),
-                        Text(
-                          cat.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: cat.color,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                : Text(
-                    key: const ValueKey('placeholder'),
-                    'Select a category above',
-                    style: GoogleFonts.inter(fontSize: 13, color: _kTextSec),
-                  ),
-          ),
-
-          const SizedBox(height: 16),
-
           // Large PKR amount
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -655,7 +462,7 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  _EditInputField — focus-aware text field (same pattern as AddExpense)
+//  _EditInputField — focus-aware text field
 // ─────────────────────────────────────────────────────────────────
 class _EditInputField extends StatefulWidget {
   final TextEditingController controller;
@@ -724,7 +531,6 @@ class _EditInputFieldState extends State<_EditInputField> {
 
 // ─────────────────────────────────────────────────────────────────
 //  _SaveConfirmationSheet
-//  Slides up from bottom to confirm before saving changes
 // ─────────────────────────────────────────────────────────────────
 class _SaveConfirmationSheet extends StatelessWidget {
   final VoidCallback onConfirm;

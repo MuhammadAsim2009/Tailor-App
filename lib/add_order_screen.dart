@@ -2,8 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:screenshot/screenshot.dart';
-import 'dart:ui' as ui;
 
 import '../models/customer_model.dart';
 import '../models/order_model.dart';
@@ -11,7 +9,6 @@ import '../models/measurement_model.dart';
 import '../controllers/order_controller.dart';
 import '../services/whatsapp_service.dart';
 import '../services/database_service.dart';
-import 'receipt_widget.dart';
 import 'dart:convert';
 
 // ─────────────────────────────────────────────────────────────────
@@ -49,11 +46,13 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   final _addrCtrl = TextEditingController();
 
   final OrderController _orderController = OrderController();
-  final ScreenshotController _screenshotController = ScreenshotController();
 
   CustomerModel? _selectedCustomer;
-  bool _measurementsLocked =
-      false; // only locked when auto-filled from an existing customer
+  bool _measurementsLocked = false; 
+
+  String? _selectedFamilyId;
+  bool _showNewFamilyInput = false;
+  final _newFamilyCtrl = TextEditingController();
 
   // ── Step 2: Customer Type ──
   bool _isAdult = true;
@@ -123,6 +122,7 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   void dispose() {
     _orderController.removeListener(_onDataLoaded);
     _pageController.dispose();
+    _newFamilyCtrl.dispose();
     _idCtrl.dispose();
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
@@ -350,11 +350,17 @@ class _AddOrderScreenState extends State<AddOrderScreen>
   }
 
   void _confirmOrder() async {
+    String? finalFamilyId = _selectedFamilyId;
+    if (_showNewFamilyInput && _newFamilyCtrl.text.trim().isNotEmpty) {
+      finalFamilyId = await _orderController.createFamily(_newFamilyCtrl.text.trim());
+    }
+
     final customer = CustomerModel(
       id: _idCtrl.text.trim(),
       name: _nameCtrl.text,
       phone: _phoneCtrl.text,
       address: _addrCtrl.text,
+      familyId: finalFamilyId,
     );
 
     final measurements = MeasurementModel(
@@ -407,23 +413,6 @@ class _AddOrderScreenState extends State<AddOrderScreen>
 
     try {
       final orderId = await _orderController.addOrder(order: order, customer: customer);
-
-      // Build the saved order & customer for the receipt
-      final savedOrder = OrderModel(
-        id: orderId,
-        customerId: customer.id,
-        isAdult: order.isAdult,
-        quantity: order.quantity,
-        orderDate: order.orderDate,
-        deliveryDate: order.deliveryDate,
-        totalAmount: order.totalAmount,
-        advancePaid: order.advancePaid,
-        measurements: order.measurements,
-        status: 'Pending',
-        updatedAt: DateTime.now(),
-        subTotal: order.subTotal,
-        pricingItems: order.pricingItems,
-      );
 
       // Send text confirmation to WhatsApp if phone is available
       if (customer.phone.isNotEmpty) {
@@ -671,6 +660,13 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                                     } else {
                                       _measurementsLocked = false;
                                     }
+                                    if (c.familyId != null) {
+                                      _selectedFamilyId = c.familyId;
+                                      _showNewFamilyInput = false;
+                                    } else {
+                                      _selectedFamilyId = null;
+                                      _showNewFamilyInput = false;
+                                    }
                                   });
                                   Navigator.pop(context);
                                 },
@@ -889,6 +885,8 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                     icon: Icons.location_on_outlined,
                     maxLines: 2,
                   ),
+                  const SizedBox(height: 16),
+                  _buildFamilySection(),
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -924,6 +922,107 @@ class _AddOrderScreenState extends State<AddOrderScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFamilySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.family_restroom, color: kTextSec, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Family (Optional)',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: kPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Column(
+            children: [
+              RadioListTile<bool>(
+                title: Text('Select Existing', style: GoogleFonts.inter(fontSize: 14)),
+                value: false,
+                groupValue: _showNewFamilyInput,
+                activeColor: kAccent,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                onChanged: (v) => setState(() => _showNewFamilyInput = v!),
+              ),
+              if (!_showNewFamilyInput)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: DropdownButtonFormField<String?>(
+                    value: _selectedFamilyId,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: kBg,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('None', style: GoogleFonts.inter()),
+                      ),
+                      ..._orderController.families.map((f) {
+                        return DropdownMenuItem<String?>(
+                          value: f.id,
+                          child: Text(f.name, style: GoogleFonts.inter()),
+                        );
+                      }),
+                    ],
+                    onChanged: (v) => setState(() => _selectedFamilyId = v),
+                  ),
+                ),
+              const Divider(height: 1),
+              RadioListTile<bool>(
+                title: Text('Create New Family', style: GoogleFonts.inter(fontSize: 14)),
+                value: true,
+                groupValue: _showNewFamilyInput,
+                activeColor: kAccent,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                onChanged: (v) => setState(() {
+                  _showNewFamilyInput = v!;
+                  _selectedFamilyId = null;
+                }),
+              ),
+              if (_showNewFamilyInput)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: TextField(
+                    controller: _newFamilyCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Enter Family Name',
+                      hintStyle: GoogleFonts.inter(color: kTextSec, fontSize: 14),
+                      filled: true,
+                      fillColor: kBg,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
