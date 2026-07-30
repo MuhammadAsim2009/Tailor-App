@@ -137,6 +137,14 @@ class MeasurementModel {
     return options;
   }
 
-  factory MeasurementModel.fromJson(String source) =>
-      MeasurementModel.fromMap(json.decode(source));
+  factory MeasurementModel.fromJson(String source) {
+    if (source.isEmpty || source == 'null') return MeasurementModel();
+    try {
+      final decoded = json.decode(source);
+      if (decoded is Map) {
+        return MeasurementModel.fromMap(Map<String, dynamic>.from(decoded));
+      }
+    } catch (_) {}
+    return MeasurementModel();
+  }
 }

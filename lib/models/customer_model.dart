@@ -93,7 +93,8 @@ class CustomerModel {
       'name': name,
       'phone': phone,
       'address': address,
-      'measurements': measurements?.toJson(),
+      // Store as a Map so Firestore can index/query it; fromFirestore handles it back
+      'measurements': measurements?.toMap(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
@@ -102,14 +103,23 @@ class CustomerModel {
   }
 
   factory CustomerModel.fromFirestore(Map<String, dynamic> map) {
+    MeasurementModel? measurements;
+    final raw = map['measurements'];
+    if (raw != null) {
+      if (raw is String) {
+        // Legacy: stored as JSON string
+        measurements = MeasurementModel.fromJson(raw);
+      } else if (raw is Map) {
+        // Current: stored as Firestore Map
+        measurements = MeasurementModel.fromMap(Map<String, dynamic>.from(raw));
+      }
+    }
     return CustomerModel(
       id: map['id'] ?? '',
       name: map['name'] ?? '',
       phone: map['phone'] ?? '',
       address: map['address'],
-      measurements: map['measurements'] != null
-          ? MeasurementModel.fromJson(map['measurements'])
-          : null,
+      measurements: measurements,
       createdAt: map['createdAt'] is Timestamp ? (map['createdAt'] as Timestamp).toDate() : null,
       updatedAt: map['updatedAt'] is Timestamp ? (map['updatedAt'] as Timestamp).toDate() : null,
       deletedAt: map['deletedAt'] is Timestamp ? (map['deletedAt'] as Timestamp).toDate() : null,

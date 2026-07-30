@@ -208,10 +208,10 @@ class FirebaseSyncService extends ChangeNotifier {
         cloudFamiliesCount = data['familiesCount'] ?? 0;
       }
 
-      final localCustomersCount = (await dbService.getAllCustomers()).length;
-      final localOrdersCount = (await dbService.getAllOrders()).length;
-      final localExpensesCount = (await dbService.getExpenses()).length;
-      final localFamiliesCount = (await dbService.getAllFamilies()).length;
+      final localCustomersCount = await dbService.getTotalCustomersCount();
+      final localOrdersCount = await dbService.getTotalOrdersCount();
+      final localExpensesCount = await dbService.getTotalExpensesCount();
+      final localFamiliesCount = await dbService.getTotalFamiliesCount();
 
       log('--- Richness Check ---');
       log('Local DB  -> Customers: $localCustomersCount | Orders: $localOrdersCount | Expenses: $localExpensesCount | Families: $localFamiliesCount');
@@ -240,10 +240,10 @@ class FirebaseSyncService extends ChangeNotifier {
       // ── UPDATE METADATA ───────────────────────────────────────────────────
       // After sync, both sides are fully matched. Update Firebase metadata.
       await _firestore.collection('metadata').doc('sync_info').set({
-        'customersCount': (await dbService.getAllCustomers()).length,
-        'ordersCount': (await dbService.getAllOrders()).length,
-        'expensesCount': (await dbService.getExpenses()).length,
-        'familiesCount': (await dbService.getAllFamilies()).length,
+        'customersCount': await dbService.getTotalCustomersCount(),
+        'ordersCount': await dbService.getTotalOrdersCount(),
+        'expensesCount': await dbService.getTotalExpensesCount(),
+        'familiesCount': await dbService.getTotalFamiliesCount(),
         'globalLastUpdatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -375,7 +375,14 @@ class FirebaseSyncService extends ChangeNotifier {
     final cloudSnapshot = await _firestore.collection('customers').get();
     final localRecords = await dbService.getSyncCustomers();
 
-    final cloudMap = {for (var doc in cloudSnapshot.docs) doc.id: CustomerModel.fromFirestore(doc.data())};
+    final cloudMap = <String, CustomerModel>{};
+    for (var doc in cloudSnapshot.docs) {
+      try {
+        cloudMap[doc.id] = CustomerModel.fromFirestore(doc.data());
+      } catch (e) {
+        log('Error parsing Customer ${doc.id} from cloud: $e');
+      }
+    }
     final localMap = {for (var record in localRecords) record.id: record};
 
     final allIds = <String>{...cloudMap.keys, ...localMap.keys};
@@ -427,7 +434,14 @@ class FirebaseSyncService extends ChangeNotifier {
     final cloudSnapshot = await _firestore.collection('families').get();
     final localRecords = await dbService.getAllFamilies();
 
-    final cloudMap = {for (var doc in cloudSnapshot.docs) doc.id: FamilyModel.fromFirestore(doc.data())};
+    final cloudMap = <String, FamilyModel>{};
+    for (var doc in cloudSnapshot.docs) {
+      try {
+        cloudMap[doc.id] = FamilyModel.fromFirestore(doc.data());
+      } catch (e) {
+        log('Error parsing Family ${doc.id} from cloud: $e');
+      }
+    }
     final localMap = {for (var record in localRecords) record.id: record};
 
     final allIds = <String>{...cloudMap.keys, ...localMap.keys};
@@ -479,7 +493,14 @@ class FirebaseSyncService extends ChangeNotifier {
     final cloudSnapshot = await _firestore.collection('orders').get();
     final localRecords = await dbService.getSyncOrders();
 
-    final cloudMap = {for (var doc in cloudSnapshot.docs) doc.id: OrderModel.fromFirestore(doc.data())};
+    final cloudMap = <String, OrderModel>{};
+    for (var doc in cloudSnapshot.docs) {
+      try {
+        cloudMap[doc.id] = OrderModel.fromFirestore(doc.data());
+      } catch (e) {
+        log('Error parsing Order ${doc.id} from cloud: $e');
+      }
+    }
     final localMap = {for (var record in localRecords) record.id: record};
 
     final allIds = <String>{...cloudMap.keys, ...localMap.keys};
@@ -531,7 +552,14 @@ class FirebaseSyncService extends ChangeNotifier {
     final cloudSnapshot = await _firestore.collection('expenses').get();
     final localRecords = await dbService.getSyncExpenses();
 
-    final cloudMap = {for (var doc in cloudSnapshot.docs) doc.id: ExpenseModel.fromFirestore(doc.data())};
+    final cloudMap = <String, ExpenseModel>{};
+    for (var doc in cloudSnapshot.docs) {
+      try {
+        cloudMap[doc.id] = ExpenseModel.fromFirestore(doc.data());
+      } catch (e) {
+        log('Error parsing Expense ${doc.id} from cloud: $e');
+      }
+    }
     final localMap = {for (var record in localRecords) record.id: record};
 
     final allIds = <String>{...cloudMap.keys, ...localMap.keys};

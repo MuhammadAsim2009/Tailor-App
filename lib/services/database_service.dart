@@ -147,7 +147,8 @@ CREATE TABLE customers (
   measurements TEXT,
   createdAt TEXT,
   updatedAt TEXT,
-  deletedAt TEXT
+  deletedAt TEXT,
+  familyId TEXT
 )
 ''');
 
@@ -525,6 +526,27 @@ CREATE TABLE families (
       whereArgs: ['1'],
     );
     FirebaseSyncService.instance.syncProfile(profileMap);
+  }
+
+  // ── Raw Total Counts for Metadata (includes soft-deleted) ─────────────────
+  Future<int> getTotalCustomersCount() async {
+    final db = await instance.database;
+    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM customers')) ?? 0;
+  }
+
+  Future<int> getTotalOrdersCount() async {
+    final db = await instance.database;
+    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM orders')) ?? 0;
+  }
+
+  Future<int> getTotalExpensesCount() async {
+    final db = await instance.database;
+    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM expenses')) ?? 0;
+  }
+
+  Future<int> getTotalFamiliesCount() async {
+    final db = await instance.database;
+    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM families')) ?? 0;
   }
 
   // ── Meta Key-Value Store ──────────────────────────────────────────────────
