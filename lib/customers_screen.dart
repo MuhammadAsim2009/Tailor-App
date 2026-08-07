@@ -304,7 +304,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
-                                '#${customer.id.length > 6 ? customer.id.substring(0, 6).toUpperCase() : customer.id.toUpperCase()}',
+                                '#${customer.id.toUpperCase()}',
                                 style: GoogleFonts.inter(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
@@ -696,7 +696,7 @@ class CustomerProfileScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              '#${customer.id.length > 6 ? customer.id.substring(0, 6).toUpperCase() : customer.id.toUpperCase()}',
+              '#${customer.id.toUpperCase()}',
               style: GoogleFonts.inter(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
@@ -715,6 +715,34 @@ class CustomerProfileScreen extends StatelessWidget {
               customer.address!,
               style: GoogleFonts.inter(fontSize: 13, color: Colors.white60),
             ),
+          ],
+          if (customer.familyId != null && customer.familyId!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Builder(builder: (context) {
+              final familyName = controller.getFamilyName(customer.familyId);
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.family_restroom, size: 14, color: Colors.white),
+                    const SizedBox(width: 6),
+                    Text(
+                      familyName.isNotEmpty ? familyName : 'Family',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ],
       ),

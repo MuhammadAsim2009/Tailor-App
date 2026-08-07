@@ -1121,9 +1121,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     addRow('Front Pocket', m.frontPocketMeasure, [
       if (m.optFrontPocket) 'Front Pocket',
     ]);
-    if (m.optSidePocket) {
-      addRow('Side Pocket', null, ['Side Pocket']);
-    }
+    addRow('Side Pocket', m.sidePocketMeasure, [
+      if (m.optSidePocket) 'Side Pocket',
+    ]);
     if ((m.cuffType.toString().isNotEmpty && m.cuffType != 'None') ||
         (m.cuffMeasure != null && m.cuffMeasure!.isNotEmpty)) {
       List<String> options = [];

@@ -157,8 +157,10 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     // Filtered list (by category chip and current month)
-    final monthExpenses = _controller.expenses.where((e) =>
-        e.date.year == _currentMonth.year && e.date.month == _currentMonth.month);
+    final monthExpenses = _controller.expenses.where((e) {
+      final d = e.date.toLocal();
+      return d.year == _currentMonth.year && d.month == _currentMonth.month;
+    });
         
     final filteredExpenses = _selectedCategory == 'All'
         ? monthExpenses.toList()
@@ -252,11 +254,16 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
   }
 
   Widget _buildSummaryCard() {
-    final monthExpenses = _controller.expenses.where((e) =>
-        e.date.year == _currentMonth.year && e.date.month == _currentMonth.month);
+    final monthExpenses = _controller.expenses.where((e) {
+      final d = e.date.toLocal();
+      return d.year == _currentMonth.year && d.month == _currentMonth.month;
+    });
     final double totalExpenses = monthExpenses.fold(0.0, (sum, e) => sum + e.amount);
     final double totalIncome = _orderController.orders
-        .where((o) => o.orderDate.year == _currentMonth.year && o.orderDate.month == _currentMonth.month)
+        .where((o) {
+          final d = o.orderDate.toLocal();
+          return d.year == _currentMonth.year && d.month == _currentMonth.month;
+        })
         .fold(0.0, (sum, o) => sum + o.advancePaid);
     final double netBalance = totalIncome - totalExpenses;
 

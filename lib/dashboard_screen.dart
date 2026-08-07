@@ -264,8 +264,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildTodayIncomeCard() {
     final now = DateTime.now();
-    bool isToday(DateTime date) =>
-        date.year == now.year && date.month == now.month && date.day == now.day;
+    bool isToday(DateTime date) {
+      final d = date.toLocal();
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    }
 
     final todayOrders = _orderController.orders
         .where((o) => isToday(o.orderDate))
@@ -339,10 +341,14 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildKPIGrid() {
     final now = DateTime.now();
-    bool isToday(DateTime date) =>
-        date.year == now.year && date.month == now.month && date.day == now.day;
-    bool isThisMonth(DateTime date) =>
-        date.year == now.year && date.month == now.month;
+    bool isToday(DateTime date) {
+      final d = date.toLocal();
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    }
+    bool isThisMonth(DateTime date) {
+      final d = date.toLocal();
+      return d.year == now.year && d.month == now.month;
+    }
 
     final allOrders = _orderController.orders;
     final todayOrders = allOrders.where((o) => isToday(o.orderDate)).toList();
@@ -402,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       childAspectRatio: 1.4,
       children: [
         _buildKPICard(
-          title: 'Today\'s Revenue',
+          title: 'Today\'s Income',
           value: todayIncome.toInt(),
           icon: Icons.account_balance_wallet_outlined,
           bgColor: kPrimaryColor,

@@ -124,7 +124,7 @@ class ReceiptWidget extends StatelessWidget {
           const SizedBox(height: 8),
           _buildInfoRow('Order Type:', order.isAdult ? 'Adult' : 'Child'),
           _buildInfoRow('Quantity:', '${order.quantity}'),
-          _buildInfoRow('Notes:', order.measurements.extraNotes ?? 'N/A'),
+
           const SizedBox(height: 12),
           _buildDashedDivider(),
           const SizedBox(height: 12),
