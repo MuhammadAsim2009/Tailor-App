@@ -65,11 +65,19 @@ class _FamilyReceiptScreenState extends State<FamilyReceiptScreen> {
   double _subtotalFor(String customerId) =>
       _ordersFor(customerId).fold(0.0, (sum, o) => sum + o.totalAmount);
 
+  double _rawSubtotalFor(String customerId) =>
+      _ordersFor(customerId).fold(0.0, (sum, o) => sum + o.subTotal);
+
   int _totalQuantityFor(String customerId) =>
       _ordersFor(customerId).fold(0, (sum, o) => sum + o.quantity);
 
   double get _grandTotal =>
       _members.fold(0.0, (sum, c) => sum + _subtotalFor(c.id));
+
+  double get _grandRawSubTotal =>
+      _members.fold(0.0, (sum, c) => sum + _rawSubtotalFor(c.id));
+
+  double get _grandOtherCharges => _grandTotal - _grandRawSubTotal;
 
   double get _grandAdvance =>
       _members.fold(
@@ -118,6 +126,8 @@ class _FamilyReceiptScreenState extends State<FamilyReceiptScreen> {
               child: _ReceiptWidget(
                 family:           widget.family,
                 members:          members,
+                grandRawSubTotal: _grandRawSubTotal,
+                grandOtherCharges:_grandOtherCharges,
                 grandTotal:       _grandTotal,
                 grandAdvance:     _grandAdvance,
                 grandRemaining:   _grandRemaining,
@@ -255,7 +265,7 @@ class _FamilyReceiptScreenState extends State<FamilyReceiptScreen> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _statusOptions.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                separatorBuilder: (a, b) => const SizedBox(width: 8),
                 itemBuilder: (context, i) {
                   final opt = _statusOptions[i];
                   final active = opt == _statusFilter;
@@ -643,7 +653,11 @@ class _FamilyReceiptScreenState extends State<FamilyReceiptScreen> {
           ),
 
           // ── Totals ──
-          _buildTotalRow('Total Amount', _grandTotal, Colors.white),
+          _buildTotalRow('Sub Total Amount', _grandRawSubTotal, Colors.white),
+          const SizedBox(height: 8),
+          _buildTotalRow('Other Charges', _grandOtherCharges, Colors.white),
+          const SizedBox(height: 8),
+          _buildTotalRow('Grand Total', _grandTotal, Colors.white),
           const SizedBox(height: 8),
           _buildTotalRow('Total Advance', _grandAdvance, _kAccent),
           Padding(
@@ -804,6 +818,8 @@ class _FamilyReceiptScreenState extends State<FamilyReceiptScreen> {
 class _ReceiptWidget extends StatelessWidget {
   final FamilyModel family;
   final List<CustomerModel> members;
+  final double grandRawSubTotal;
+  final double grandOtherCharges;
   final double grandTotal;
   final double grandAdvance;
   final double grandRemaining;
@@ -818,6 +834,8 @@ class _ReceiptWidget extends StatelessWidget {
   const _ReceiptWidget({
     required this.family,
     required this.members,
+    required this.grandRawSubTotal,
+    required this.grandOtherCharges,
     required this.grandTotal,
     required this.grandAdvance,
     required this.grandRemaining,
@@ -977,7 +995,11 @@ class _ReceiptWidget extends StatelessWidget {
                 const SizedBox(height: 6),
                 _buildPaymentRow('Total Quantity:', '$totalQuantity', Colors.white),
                 const Divider(color: Colors.white24, height: 16),
-                _buildPaymentRow('Total Amount:', 'PKR ${grandTotal.toStringAsFixed(0)}', Colors.white),
+                _buildPaymentRow('Sub Total Amount:', 'PKR ${grandRawSubTotal.toStringAsFixed(0)}', Colors.white),
+                const SizedBox(height: 6),
+                _buildPaymentRow('Other Charges:', 'PKR ${grandOtherCharges.toStringAsFixed(0)}', Colors.white),
+                const SizedBox(height: 6),
+                _buildPaymentRow('Grand Total:', 'PKR ${grandTotal.toStringAsFixed(0)}', Colors.white),
                 const SizedBox(height: 8),
                 _buildPaymentRow('Advance Paid:', 'PKR ${grandAdvance.toStringAsFixed(0)}', _kAccent),
                 const Divider(color: Colors.white24, height: 16),

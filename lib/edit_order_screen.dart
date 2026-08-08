@@ -1421,7 +1421,7 @@ class _InputField extends StatefulWidget {
   final List<TextInputFormatter> inputFormatters;
   final int maxLines;
   final bool readOnly;
-  final ValueChanged<String>? onChanged;
+
   final String? hint;
   final String? Function(String?)? validator;
 
@@ -1433,7 +1433,7 @@ class _InputField extends StatefulWidget {
     this.inputFormatters = const [],
     this.maxLines = 1,
     this.readOnly = false,
-    this.onChanged,
+
     this.hint,
     this.validator,
   });
@@ -1455,7 +1455,7 @@ class _InputFieldState extends State<_InputField> {
         inputFormatters: widget.inputFormatters,
         maxLines: widget.maxLines,
         readOnly: widget.readOnly,
-        onChanged: widget.onChanged,
+
         validator: widget.validator,
         style: GoogleFonts.inter(fontSize: 14, color: kTextPri),
         decoration: InputDecoration(

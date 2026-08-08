@@ -276,13 +276,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       0,
       (sum, o) => sum + o.advancePaid,
     );
-    final todayExpenses = _expenseController.expenses
-        .where((e) => isToday(e.date))
-        .toList();
-    final totalExpenses = todayExpenses.fold<double>(
-      0,
-      (sum, e) => sum + e.amount,
-    );
+
     final dailyRevenue =
         totalCollected; // Changed from totalCollected - totalExpenses
 
@@ -377,9 +371,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         .where(
           (o) =>
               o.status == 'Delivered' &&
-              (o.updatedAt != null
-                  ? isToday(o.updatedAt!)
-                  : isToday(o.orderDate)),
+              isToday(o.updatedAt),
         )
         .length;
 
