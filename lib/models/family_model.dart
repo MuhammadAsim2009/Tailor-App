@@ -4,6 +4,7 @@ class FamilyModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? deletedAt;
+  final int memberCount;
 
   FamilyModel({
     required this.id,
@@ -11,6 +12,7 @@ class FamilyModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     this.deletedAt,
+    this.memberCount = 0,
   })  : createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
 
@@ -20,6 +22,7 @@ class FamilyModel {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? deletedAt,
+    int? memberCount,
   }) {
     return FamilyModel(
       id: id ?? this.id,
@@ -27,6 +30,7 @@ class FamilyModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      memberCount: memberCount ?? this.memberCount,
     );
   }
 
@@ -37,6 +41,7 @@ class FamilyModel {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       if (deletedAt != null) 'deletedAt': deletedAt!.toIso8601String(),
+      'memberCount': memberCount,
     };
   }
 
@@ -51,6 +56,7 @@ class FamilyModel {
       createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'] as String) : null,
       updatedAt: map['updatedAt'] != null ? DateTime.tryParse(map['updatedAt'] as String) : null,
       deletedAt: map['deletedAt'] != null ? DateTime.tryParse(map['deletedAt'] as String) : null,
+      memberCount: map['memberCount'] ?? 0,
     );
   }
 

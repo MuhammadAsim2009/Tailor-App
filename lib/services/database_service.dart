@@ -24,7 +24,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -135,6 +135,11 @@ CREATE TABLE IF NOT EXISTS families (
         await db.execute('ALTER TABLE families ADD COLUMN deletedAt TEXT;');
       } catch (_) {}
     }
+    if (oldVersion < 12) {
+      try {
+        await db.execute('ALTER TABLE families ADD COLUMN memberCount INTEGER DEFAULT 0;');
+      } catch (_) {}
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -221,7 +226,8 @@ CREATE TABLE families (
   name TEXT NOT NULL,
   createdAt TEXT,
   updatedAt TEXT,
-  deletedAt TEXT
+  deletedAt TEXT,
+  memberCount INTEGER DEFAULT 0
 )
 ''');
   }

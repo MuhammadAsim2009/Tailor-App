@@ -7,7 +7,6 @@ import '../models/order_model.dart';
 import '../models/family_model.dart';
 import '../controllers/order_controller.dart';
 import '../services/whatsapp_service.dart';
-import '../services/database_service.dart';
 import 'family_receipt_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -1406,88 +1405,9 @@ class _FamiliesListSheet extends StatelessWidget {
   }
 
   void _showEditFamilyDialog(BuildContext context, FamilyModel family) {
-    final nameCtrl = TextEditingController(text: family.name);
-    // Keep a local copy of members
-    final members = controller.getCustomersByFamilyId(family.id);
-
     showDialog(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              backgroundColor: kBgColor,
-              title: Text('Edit Family', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimaryColor)),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Family Name',
-                        labelStyle: GoogleFonts.inter(color: kTextSecondary),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text('Members', style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kTextPrimary)),
-                    const SizedBox(height: 8),
-                    if (members.isEmpty)
-                      Text('No members in this family.', style: GoogleFonts.inter(color: kTextSecondary, fontSize: 13))
-                    else
-                      Flexible(
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: members.length,
-                          itemBuilder: (context, index) {
-                            final customer = members[index];
-                            final isActive = customer.familyId == family.id;
-                            return SwitchListTile(
-                              title: Text(customer.name, style: GoogleFonts.inter(fontSize: 14)),
-                              value: isActive,
-                              activeColor: kAccentColor,
-                              onChanged: (val) {
-                                setState(() {
-                                  final updated = customer.copyWith(familyId: val ? family.id : null, clearFamilyId: !val);
-                                  members[index] = updated;
-                                  controller.updateCustomer(updated);
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text('Close', style: GoogleFonts.inter(color: kTextSecondary)),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final name = nameCtrl.text.trim();
-                    if (name.isNotEmpty && name != family.name) {
-                      await controller.updateFamily(family.copyWith(name: name));
-                    }
-                    if (context.mounted) Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kAccentColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: Text('Save Name', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => _EditFamilyDialog(family: family, controller: controller),
     );
   }
 
@@ -1558,7 +1478,7 @@ class _FamiliesListSheet extends StatelessWidget {
                 shrinkWrap: true,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 itemCount: families.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (a, b) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final family = families[index];
                   final members = controller.getCustomersByFamilyId(family.id);
@@ -1630,6 +1550,273 @@ class _FamiliesListSheet extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------
+//  _EditFamilyDialog
+// -----------------------------------------------------------------
+class _EditFamilyDialog extends StatefulWidget {
+  final FamilyModel family;
+  final OrderController controller;
+  const _EditFamilyDialog({required this.family, required this.controller});
+
+  @override
+  State<_EditFamilyDialog> createState() => _EditFamilyDialogState();
+}
+
+class _EditFamilyDialogState extends State<_EditFamilyDialog> {
+  late TextEditingController _nameCtrl;
+  late List<CustomerModel> _members;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.family.name);
+    _refreshMembers();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  void _refreshMembers() {
+    _members = List<CustomerModel>.from(
+      widget.controller.getCustomersByFamilyId(widget.family.id),
+    );
+  }
+
+  Future<void> _showAddMemberPicker() async {
+    final available = widget.controller.customers
+        .where((c) => c.familyId != widget.family.id && c.deletedAt == null)
+        .toList();
+
+    if (available.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('All customers are already in this family.',
+              style: GoogleFonts.inter(color: Colors.white)),
+          backgroundColor: kTextSecondary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ));
+      }
+      return;
+    }
+
+    String searchQuery = '';
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setPickerState) {
+        final filtered = available
+            .where((c) =>
+                c.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
+                c.phone.contains(searchQuery) ||
+                c.id.toLowerCase().contains(searchQuery.toLowerCase()))
+            .toList();
+
+        return AlertDialog(
+          backgroundColor: kBgColor,
+          contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          title: Text('Add Member',
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimaryColor)),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 360,
+            child: Column(children: [
+              TextField(
+                autofocus: true,
+                onChanged: (v) => setPickerState(() => searchQuery = v),
+                decoration: InputDecoration(
+                  hintText: 'Search by name or phone...',
+                  hintStyle: GoogleFonts.inter(color: kTextSecondary, fontSize: 13),
+                  prefixIcon: const Icon(Icons.search, color: kTextSecondary, size: 20),
+                  filled: true,
+                  fillColor: Colors.white,
+                  isDense: true,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Text('No customers found.',
+                            style: GoogleFonts.inter(color: kTextSecondary)))
+                    : ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (a, b) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final c = filtered[i];
+                          final bool inOtherFamily = c.familyId != null && c.familyId!.isNotEmpty;
+                          final displayId = c.id.length > 6 ? c.id.substring(0, 6) : c.id;
+                          return ListTile(
+                            dense: true,
+                            leading: CircleAvatar(
+                              backgroundColor: kPrimaryColor.withValues(alpha: 0.1),
+                              child: Text(c.initials,
+                                  style: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      color: kPrimaryColor,
+                                      fontSize: 12)),
+                            ),
+                            title: Text(c.name,
+                                style: GoogleFonts.inter(
+                                    fontSize: 14, fontWeight: FontWeight.w600)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('${c.phone} • ID: $displayId',
+                                    style: GoogleFonts.inter(
+                                        fontSize: 12, color: kTextSecondary)),
+                                if (inOtherFamily)
+                                  Text('Already in a family',
+                                      style: GoogleFonts.inter(
+                                          fontSize: 12, color: Colors.red)),
+                              ],
+                            ),
+                            onTap: inOtherFamily
+                                ? null
+                                : () async {
+                                    final updated = c.copyWith(familyId: widget.family.id);
+                                    await widget.controller.updateCustomer(updated);
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (mounted) setState(() => _refreshMembers());
+                                  },
+                          );
+                        },
+                      ),
+              ),
+            ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+            ),
+          ],
+        );
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: kBgColor,
+      title: Text('Edit Family',
+          style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: kPrimaryColor)),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _nameCtrl,
+              decoration: InputDecoration(
+                labelText: 'Family Name',
+                labelStyle: GoogleFonts.inter(color: kTextSecondary),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Members',
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold, color: kTextPrimary)),
+                TextButton.icon(
+                  onPressed: _showAddMemberPicker,
+                  icon: const Icon(Icons.person_add_outlined,
+                      size: 16, color: kAccentColor),
+                  label: Text('Add Member',
+                      style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: kAccentColor)),
+                  style: TextButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            if (_members.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'No members yet. Tap "Add Member" to add existing customers.',
+                  style: GoogleFonts.inter(color: kTextSecondary, fontSize: 13),
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _members.length,
+                  itemBuilder: (context, index) {
+                    final customer = _members[index];
+                    return SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(customer.name,
+                          style: GoogleFonts.inter(fontSize: 14)),
+                      subtitle: Text(customer.phone,
+                          style: GoogleFonts.inter(
+                              fontSize: 12, color: kTextSecondary)),
+                      value: customer.familyId == widget.family.id,
+                      activeThumbColor: kAccentColor,
+                      onChanged: (val) async {
+                        final updated = customer.copyWith(
+                          familyId: val ? widget.family.id : null,
+                          clearFamilyId: !val,
+                        );
+                        await widget.controller.updateCustomer(updated);
+                        if (mounted) setState(() => _refreshMembers());
+                      },
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Close', style: GoogleFonts.inter(color: kTextSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final name = _nameCtrl.text.trim();
+            if (name.isNotEmpty && name != widget.family.name) {
+              await widget.controller
+                  .updateFamily(widget.family.copyWith(name: name));
+            }
+            if (context.mounted) Navigator.pop(context);
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kAccentColor,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text('Save Name',
+              style: GoogleFonts.inter(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+        ),
+      ],
     );
   }
 }

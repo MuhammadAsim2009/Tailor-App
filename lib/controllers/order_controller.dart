@@ -103,32 +103,43 @@ class OrderController extends ChangeNotifier {
   String get nextCustomerId => generateNextId(customers.map((c) => c.id));
   String get nextOrderId => generateNextId(orders.map((o) => o.id));
 
+  /// Recalculates the memberCount for the given [familyId] based on the
+  /// in-memory customers list and persists the update to SQLite + Firebase.
+  Future<void> _refreshFamilyCount(String familyId) async {
+    final family = getFamilyById(familyId);
+    if (family == null) return;
+    final count = customers
+        .where((c) => c.familyId == familyId && c.deletedAt == null)
+        .length;
+    final updated = family.copyWith(memberCount: count, updatedAt: DateTime.now());
+    await _dbService.updateFamily(updated);
+  }
+
   Future<String> addOrder({
     required OrderModel order,
     required CustomerModel customer,
   }) async {
     try {
       final customerToSave = customer.id.isEmpty
-          ? CustomerModel(
+          ? customer.copyWith(
               id: nextCustomerId,
-              name: customer.name,
-              phone: customer.phone,
-              address: customer.address,
               measurements: order.measurements,
+              createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
-              familyId: customer.familyId,
             )
-          : CustomerModel(
-              id: customer.id,
-              name: customer.name,
-              phone: customer.phone,
-              address: customer.address,
+          : customer.copyWith(
               measurements: order.measurements,
               updatedAt: DateTime.now(),
-              familyId: customer.familyId,
             );
 
       await _dbService.insertCustomer(customerToSave);
+
+      // ── Update family member count if the customer belongs to one ──────
+      if (customer.id.isEmpty && customerToSave.familyId != null) {
+        // New customer — load data first so the in-memory list is up to date
+        await loadData();
+        await _refreshFamilyCount(customerToSave.familyId!);
+      }
 
       final orderToSave = OrderModel(
         id: nextOrderId,
@@ -220,11 +231,7 @@ class OrderController extends ChangeNotifier {
 
       final customer = getCustomerById(order.customerId);
       if (customer != null) {
-        final updatedCustomer = CustomerModel(
-          id: customer.id,
-          name: customer.name,
-          phone: customer.phone,
-          address: customer.address,
+        final updatedCustomer = customer.copyWith(
           measurements: orderToSave.measurements,
           updatedAt: DateTime.now(),
         );
@@ -254,9 +261,21 @@ class OrderController extends ChangeNotifier {
 
   Future<void> updateCustomer(CustomerModel customer) async {
     try {
+      // Capture previous familyId before the update
+      final previous = getCustomerById(customer.id);
+      final previousFamilyId = previous?.familyId;
+
       final customerToSave = customer.copyWith(updatedAt: DateTime.now());
       await _dbService.updateCustomer(customerToSave);
       await loadData();
+
+      // Adjust counts for any changed family links
+      final newFamilyId = customerToSave.familyId;
+      if (previousFamilyId != newFamilyId) {
+        if (previousFamilyId != null) await _refreshFamilyCount(previousFamilyId);
+        if (newFamilyId != null) await _refreshFamilyCount(newFamilyId);
+        await loadData();
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error updating customer: $e');
@@ -267,8 +286,17 @@ class OrderController extends ChangeNotifier {
 
   Future<void> deleteCustomer(String customerId) async {
     try {
+      // Capture the family before deletion so we can update its count after
+      final customer = getCustomerById(customerId);
+      final familyId = customer?.familyId;
+
       await _dbService.deleteCustomer(customerId);
       await loadData();
+
+      if (familyId != null) {
+        await _refreshFamilyCount(familyId);
+        await loadData();
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error deleting customer: $e');
