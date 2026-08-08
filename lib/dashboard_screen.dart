@@ -269,16 +269,12 @@ class _DashboardScreenState extends State<DashboardScreen>
       return d.year == now.year && d.month == now.month && d.day == now.day;
     }
 
-    final todayOrders = _orderController.orders
-        .where((o) => isToday(o.orderDate))
-        .toList();
-    final totalCollected = todayOrders.fold<double>(
-      0,
-      (sum, o) => sum + o.advancePaid,
-    );
+    // Sum payments that were actually recorded today (from the payments ledger)
+    final totalCollected = _orderController.payments
+        .where((p) => isToday(p.paidAt))
+        .fold<double>(0, (sum, p) => sum + p.amount);
 
-    final dailyRevenue =
-        totalCollected; // Changed from totalCollected - totalExpenses
+    final dailyIncome = totalCollected;
 
     return Container(
       width: double.infinity,
@@ -321,7 +317,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const SizedBox(height: 12),
           Text(
-            'Rs. ${dailyRevenue.toInt()}',
+            'Rs. ${dailyIncome.toInt()}',
             style: GoogleFonts.inter(
               fontSize: 32,
               fontWeight: FontWeight.bold,
@@ -339,18 +335,16 @@ class _DashboardScreenState extends State<DashboardScreen>
       final d = date.toLocal();
       return d.year == now.year && d.month == now.month && d.day == now.day;
     }
+
     bool isThisMonth(DateTime date) {
       final d = date.toLocal();
       return d.year == now.year && d.month == now.month;
     }
 
-    final allOrders = _orderController.orders;
-    final todayOrders = allOrders.where((o) => isToday(o.orderDate)).toList();
-
-    final todayCollected = todayOrders.fold<double>(
-      0,
-      (sum, o) => sum + o.advancePaid,
-    );
+    // Use payments ledger for accurate daily income tracking
+    final todayCollected = _orderController.payments
+        .where((p) => isToday(p.paidAt))
+        .fold<double>(0, (sum, p) => sum + p.amount);
     final todayExpensesList = _expenseController.expenses
         .where((e) => isToday(e.date))
         .toList();
@@ -358,7 +352,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       0,
       (sum, e) => sum + e.amount,
     );
-    final todayIncome = todayCollected - todayTotalExpenses;
+    final todayRevenue = todayCollected - todayTotalExpenses;
+
+    final allOrders = _orderController.orders;
+    final todayOrders = allOrders.where((o) => isToday(o.orderDate)).toList();
 
     final total = todayOrders.length;
     // Keep pending dues as overall since it's cumulative debt
@@ -368,11 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     // Completed today
     final completed = allOrders
-        .where(
-          (o) =>
-              o.status == 'Delivered' &&
-              isToday(o.updatedAt),
-        )
+        .where((o) => o.status == 'Delivered' && isToday(o.updatedAt))
         .length;
 
     final monthOrders = allOrders
@@ -400,8 +393,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       childAspectRatio: 1.4,
       children: [
         _buildKPICard(
-          title: 'Today\'s Income',
-          value: todayIncome.toInt(),
+          title: 'Today\'s Revenue',
+          value: todayRevenue.toInt(),
           icon: Icons.account_balance_wallet_outlined,
           bgColor: kPrimaryColor,
           textColor: Colors.white,

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/order_model.dart';
 import '../models/customer_model.dart';
 import '../models/family_model.dart';
+import '../models/payment_model.dart';
 import '../services/database_service.dart';
 
 class OrderController extends ChangeNotifier {
@@ -11,6 +12,7 @@ class OrderController extends ChangeNotifier {
   List<CustomerModel> customers = [];
   List<OrderModel> orders = [];
   List<FamilyModel> families = [];
+  List<PaymentModel> payments = [];
 
   bool isLoading = false;
 
@@ -30,6 +32,7 @@ class OrderController extends ChangeNotifier {
       customers = await _dbService.getAllCustomers();
       orders = await _dbService.getAllOrders();
       families = await _dbService.getAllFamilies();
+      payments = await _dbService.getAllPayments();
     } catch (e) {
       if (kDebugMode) {
         print('Error loading data: $e');
@@ -102,6 +105,7 @@ class OrderController extends ChangeNotifier {
 
   String get nextCustomerId => generateNextId(customers.map((c) => c.id));
   String get nextOrderId => generateNextId(orders.map((o) => o.id));
+  String get nextPaymentId => generateNextId(payments.map((p) => p.id));
 
   /// Recalculates the memberCount for the given [familyId] based on the
   /// in-memory customers list and persists the update to SQLite + Firebase.
@@ -159,6 +163,18 @@ class OrderController extends ChangeNotifier {
 
       await _dbService.insertOrder(orderToSave);
 
+      // Record a payment entry if advance was paid at order creation
+      if (orderToSave.advancePaid > 0) {
+        final payment = PaymentModel(
+          id: nextPaymentId,
+          orderId: orderToSave.id,
+          customerId: orderToSave.customerId,
+          amount: orderToSave.advancePaid,
+          paidAt: DateTime.now(),
+        );
+        await _dbService.insertPayment(payment);
+      }
+
       if (kDebugMode) {
         print('Order saved: ${orderToSave.id}');
         print('Customer saved: ${customerToSave.id}');
@@ -214,7 +230,27 @@ class OrderController extends ChangeNotifier {
 
   Future<void> markOrderAsPaid(String orderId, double totalAmount) async {
     try {
+      // Get the previous advance so we only record the delta as a new payment
+      final existing = orders.firstWhere(
+        (o) => o.id == orderId,
+        orElse: () => throw Exception('Order not found'),
+      );
+      final delta = totalAmount - existing.advancePaid;
+
       await _dbService.updateOrderAdvancePaid(orderId, totalAmount);
+
+      // Record the additional payment amount
+      if (delta > 0) {
+        final payment = PaymentModel(
+          id: nextPaymentId,
+          orderId: orderId,
+          customerId: existing.customerId,
+          amount: delta,
+          paidAt: DateTime.now(),
+        );
+        await _dbService.insertPayment(payment);
+      }
+
       await loadData();
     } catch (e) {
       if (kDebugMode) {

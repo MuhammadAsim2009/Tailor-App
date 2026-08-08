@@ -5,6 +5,7 @@ import '../models/customer_model.dart';
 import '../models/order_model.dart';
 import '../models/expense_model.dart';
 import '../models/family_model.dart';
+import '../models/payment_model.dart';
 import '../models/profile_model.dart';
 import '../controllers/order_controller.dart';
 import '../controllers/expense_controller.dart';
@@ -153,6 +154,26 @@ class FirebaseSyncService extends ChangeNotifier {
 
   void deleteExpense(String id) {}
 
+  void syncPayment(PaymentModel payment) {
+    _startOp();
+    _firestore.collection('payments').doc(payment.id).set(payment.toMap()).then((_) {
+      _finishOp();
+    }).catchError((e) {
+      log('Error syncing payment: $e');
+      _finishOp(error: true);
+    });
+  }
+
+  void deletePaymentFromFirestore(String paymentId) {
+    _startOp();
+    _firestore.collection('payments').doc(paymentId).delete().then((_) {
+      _finishOp();
+    }).catchError((e) {
+      log('Error deleting payment from firestore: $e');
+      _finishOp(error: true);
+    });
+  }
+
   void syncProfile(Map<String, dynamic> profileMap) {
     _startOp();
     final profile = ProfileModel.fromMap(profileMap);
@@ -234,6 +255,7 @@ class FirebaseSyncService extends ChangeNotifier {
       await _syncOrdersCollection(dbService, sqldb, lastSyncAt);
       await _syncExpensesCollection(dbService, sqldb, lastSyncAt);
       await _syncFamiliesCollection(dbService, sqldb, lastSyncAt);
+      await _syncPaymentsCollection(dbService, sqldb);
 
       await dbService.saveLastSyncAt(syncStartedAt);
 
@@ -276,11 +298,12 @@ class FirebaseSyncService extends ChangeNotifier {
       final sqldb = await dbService.database;
 
       log('--- FORCE PULL: Fetching all Firebase data ---');
-      final profileSnap = await _firestore.collection('profile').get();
+      final profileSnap   = await _firestore.collection('profile').get();
       final customersSnap = await _firestore.collection('customers').get();
-      final ordersSnap = await _firestore.collection('orders').get();
-      final expensesSnap = await _firestore.collection('expenses').get();
-      final familiesSnap = await _firestore.collection('families').get();
+      final ordersSnap    = await _firestore.collection('orders').get();
+      final expensesSnap  = await _firestore.collection('expenses').get();
+      final familiesSnap  = await _firestore.collection('families').get();
+      final paymentsSnap  = await _firestore.collection('payments').get();
 
       log('--- FORCE PULL: Wiping local SQLite tables ---');
       await sqldb.transaction((txn) async {
@@ -289,6 +312,7 @@ class FirebaseSyncService extends ChangeNotifier {
         await txn.delete('orders');
         await txn.delete('expenses');
         await txn.delete('families');
+        await txn.delete('payments');
         
         log('--- FORCE PULL: Inserting Firebase data into SQLite ---');
         if (profileSnap.docs.isNotEmpty) {
@@ -310,6 +334,10 @@ class FirebaseSyncService extends ChangeNotifier {
         for (var doc in familiesSnap.docs) {
           final family = FamilyModel.fromFirestore(doc.data());
           await txn.insert('families', family.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
+        for (var doc in paymentsSnap.docs) {
+          final payment = PaymentModel.fromMap(doc.data());
+          await txn.insert('payments', payment.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
         }
       });
 
@@ -602,6 +630,38 @@ class FirebaseSyncService extends ChangeNotifier {
         }
       } catch (e) {
         log('Failed to sync expense $id: $e');
+      }
+    }
+  }
+
+  /// Payments are immutable — no conflict resolution needed.
+  /// Simply push local-only records to cloud and pull cloud-only records locally.
+  Future<void> _syncPaymentsCollection(
+      DatabaseService dbService, Database sqldb) async {
+    final cloudSnapshot = await _firestore.collection('payments').get();
+    final localRecords  = await dbService.getAllPayments();
+
+    final cloudIds = {for (var doc in cloudSnapshot.docs) doc.id: doc.data()};
+    final localMap = {for (var p in localRecords) p.id: p};
+
+    // Push local-only payments to Firestore
+    for (final p in localRecords) {
+      if (!cloudIds.containsKey(p.id)) {
+        log('Payment ${p.id}: local only, pushing to cloud');
+        await _firestore.collection('payments').doc(p.id).set(p.toMap());
+      }
+    }
+
+    // Pull cloud-only payments into SQLite
+    for (final entry in cloudIds.entries) {
+      if (!localMap.containsKey(entry.key)) {
+        try {
+          log('Payment ${entry.key}: new from cloud, inserting locally');
+          final payment = PaymentModel.fromMap(entry.value);
+          await sqldb.insert('payments', payment.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        } catch (e) {
+          log('Error parsing Payment ${entry.key} from cloud: $e');
+        }
       }
     }
   }

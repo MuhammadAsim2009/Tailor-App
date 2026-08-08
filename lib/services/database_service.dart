@@ -4,6 +4,7 @@ import '../models/order_model.dart';
 import '../models/customer_model.dart';
 import '../models/family_model.dart';
 import '../models/expense_model.dart';
+import '../models/payment_model.dart';
 import 'firebase_sync_service.dart';
 
 class DatabaseService {
@@ -24,7 +25,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 12,
+      version: 13,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -140,6 +141,45 @@ CREATE TABLE IF NOT EXISTS families (
         await db.execute('ALTER TABLE families ADD COLUMN memberCount INTEGER DEFAULT 0;');
       } catch (_) {}
     }
+    if (oldVersion < 13) {
+      // Add payments ledger table
+      try {
+        await db.execute('''
+CREATE TABLE IF NOT EXISTS payments (
+  id TEXT PRIMARY KEY,
+  orderId TEXT NOT NULL,
+  customerId TEXT NOT NULL,
+  amount REAL NOT NULL,
+  paidAt TEXT NOT NULL
+)
+''');
+      } catch (_) {}
+
+      // ── Backfill historical payments from existing orders ──────────────────
+      // For every order that already has advancePaid > 0, create one payment
+      // record dated to the order's orderDate so historical income is preserved.
+      try {
+        final orders = await db.query(
+          'orders',
+          columns: ['id', 'customerId', 'advancePaid', 'orderDate'],
+          where: 'advancePaid > 0',
+        );
+        int paymentSeq = 1;
+        for (final row in orders) {
+          await db.insert(
+            'payments',
+            {
+              'id': 'hist_${paymentSeq++}',
+              'orderId': row['id'] as String,
+              'customerId': row['customerId'] as String,
+              'amount': row['advancePaid'],
+              'paidAt': row['orderDate'] as String,
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+      } catch (_) {}
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -230,6 +270,54 @@ CREATE TABLE families (
   memberCount INTEGER DEFAULT 0
 )
 ''');
+
+    await db.execute('''
+CREATE TABLE payments (
+  id TEXT PRIMARY KEY,
+  orderId TEXT NOT NULL,
+  customerId TEXT NOT NULL,
+  amount REAL NOT NULL,
+  paidAt TEXT NOT NULL
+)
+''');
+  }
+
+  // ── Payment Ledger ──────────────────────────────────────────────────────────
+
+  Future<void> insertPayment(PaymentModel payment) async {
+    final db = await instance.database;
+    await db.insert('payments', payment.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    FirebaseSyncService.instance.syncPayment(payment);
+  }
+
+  Future<List<PaymentModel>> getAllPayments() async {
+    final db = await instance.database;
+    final result = await db.query('payments', orderBy: 'paidAt DESC');
+    return result.map((r) => PaymentModel.fromMap(r)).toList();
+  }
+
+  /// Sum all payment amounts recorded on [date].
+  Future<double> getTodayPaymentsTotal(DateTime date) async {
+    final db = await instance.database;
+    final start = DateTime(date.year, date.month, date.day).toIso8601String();
+    final end   = DateTime(date.year, date.month, date.day, 23, 59, 59).toIso8601String();
+    final result = await db.rawQuery(
+      'SELECT COALESCE(SUM(amount), 0) as total FROM payments WHERE paidAt >= ? AND paidAt <= ?',
+      [start, end],
+    );
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  /// Delete all payment records tied to [orderId] from SQLite and Firestore.
+  Future<void> deletePaymentsByOrderId(String orderId) async {
+    final db = await instance.database;
+    // Get the payment IDs before deleting so we can remove them from Firestore too
+    final rows = await db.query('payments', columns: ['id'], where: 'orderId = ?', whereArgs: [orderId]);
+    await db.delete('payments', where: 'orderId = ?', whereArgs: [orderId]);
+    // Remove from Firestore
+    for (final row in rows) {
+      FirebaseSyncService.instance.deletePaymentFromFirestore(row['id'] as String);
+    }
   }
 
   Future<void> insertCustomer(CustomerModel customer) async {
@@ -360,6 +448,8 @@ CREATE TABLE families (
   Future<void> deleteOrder(String orderId) async {
     final db = await instance.database;
     final now = DateTime.now().toIso8601String();
+    // Remove associated payment records first so they don't linger in income stats
+    await deletePaymentsByOrderId(orderId);
     await db.update(
       'orders',
       {'deletedAt': now},
