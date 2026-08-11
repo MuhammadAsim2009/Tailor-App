@@ -220,6 +220,7 @@ class FirebaseSyncService extends ChangeNotifier {
       int cloudCustomersCount = 0;
       int cloudExpensesCount = 0;
       int cloudFamiliesCount = 0;
+      int cloudPaymentsCount = 0;
       
       if (metaDoc.exists) {
         final data = metaDoc.data()!;
@@ -227,16 +228,18 @@ class FirebaseSyncService extends ChangeNotifier {
         cloudCustomersCount = data['customersCount'] ?? 0;
         cloudExpensesCount = data['expensesCount'] ?? 0;
         cloudFamiliesCount = data['familiesCount'] ?? 0;
+        cloudPaymentsCount = data['paymentsCount'] ?? 0;
       }
 
       final localCustomersCount = await dbService.getTotalCustomersCount();
       final localOrdersCount = await dbService.getTotalOrdersCount();
       final localExpensesCount = await dbService.getTotalExpensesCount();
       final localFamiliesCount = await dbService.getTotalFamiliesCount();
+      final localPaymentsCount = await dbService.getTotalPaymentsCount();
 
       log('--- Richness Check ---');
-      log('Local DB  -> Customers: $localCustomersCount | Orders: $localOrdersCount | Expenses: $localExpensesCount | Families: $localFamiliesCount');
-      log('Firebase  -> Customers: $cloudCustomersCount | Orders: $cloudOrdersCount | Expenses: $cloudExpensesCount | Families: $cloudFamiliesCount');
+      log('Local DB  -> Customers: $localCustomersCount | Orders: $localOrdersCount | Expenses: $localExpensesCount | Families: $localFamiliesCount | Payments: $localPaymentsCount');
+      log('Firebase  -> Customers: $cloudCustomersCount | Orders: $cloudOrdersCount | Expenses: $cloudExpensesCount | Families: $cloudFamiliesCount | Payments: $cloudPaymentsCount');
       
       if (localOrdersCount == 0 && cloudOrdersCount > 0) {
         log('Condition met: SQLite local DB is empty/deleted, Firebase is richer. Pulling all data from Firebase.');
@@ -266,6 +269,7 @@ class FirebaseSyncService extends ChangeNotifier {
         'ordersCount': await dbService.getTotalOrdersCount(),
         'expensesCount': await dbService.getTotalExpensesCount(),
         'familiesCount': await dbService.getTotalFamiliesCount(),
+        'paymentsCount': await dbService.getTotalPaymentsCount(),
         'globalLastUpdatedAt': FieldValue.serverTimestamp(),
       });
 

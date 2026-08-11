@@ -66,7 +66,7 @@ class _FamilyReceiptScreenState extends State<FamilyReceiptScreen> {
       _ordersFor(customerId).fold(0.0, (sum, o) => sum + o.totalAmount);
 
   double _rawSubtotalFor(String customerId) =>
-      _ordersFor(customerId).fold(0.0, (sum, o) => sum + o.subTotal);
+      _ordersFor(customerId).fold(0.0, (sum, o) => sum + (o.subTotal > 0 ? o.subTotal : o.totalAmount));
 
   int _totalQuantityFor(String customerId) =>
       _ordersFor(customerId).fold(0, (sum, o) => sum + o.quantity);
@@ -77,7 +77,16 @@ class _FamilyReceiptScreenState extends State<FamilyReceiptScreen> {
   double get _grandRawSubTotal =>
       _members.fold(0.0, (sum, c) => sum + _rawSubtotalFor(c.id));
 
-  double get _grandOtherCharges => _grandTotal - _grandRawSubTotal;
+  double get _grandOtherCharges => _members.fold(
+      0.0,
+      (sum, c) =>
+          sum +
+          _ordersFor(c.id).fold(0.0, (s, o) {
+            if (o.subTotal > 0) {
+              return s + (o.totalAmount - o.subTotal);
+            }
+            return s;
+          }));
 
   double get _grandAdvance =>
       _members.fold(

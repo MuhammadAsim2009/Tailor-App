@@ -368,13 +368,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         .where((o) => o.status == 'Delivered' && isToday(o.updatedAt))
         .length;
 
-    final monthOrders = allOrders
-        .where((o) => isThisMonth(o.orderDate))
-        .toList();
-    final monthCollected = monthOrders.fold<double>(
-      0,
-      (sum, o) => sum + o.advancePaid,
-    );
+    final monthCollected = _orderController.payments
+        .where((p) => isThisMonth(p.paidAt))
+        .fold<double>(0, (sum, p) => sum + p.amount);
     final monthExpenses = _expenseController.expenses
         .where((e) => isThisMonth(e.date))
         .toList();

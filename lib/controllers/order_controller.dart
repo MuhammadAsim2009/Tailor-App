@@ -262,6 +262,22 @@ class OrderController extends ChangeNotifier {
 
   Future<void> updateOrder(OrderModel order) async {
     try {
+      final existing = orders.firstWhere(
+        (o) => o.id == order.id,
+        orElse: () => order,
+      );
+      final delta = order.advancePaid - existing.advancePaid;
+      if (delta != 0) {
+        final payment = PaymentModel(
+          id: nextPaymentId,
+          orderId: order.id,
+          customerId: order.customerId,
+          amount: delta,
+          paidAt: DateTime.now(),
+        );
+        await _dbService.insertPayment(payment);
+      }
+
       final orderToSave = order.copyWith(updatedAt: DateTime.now());
       await _dbService.updateOrder(orderToSave);
 

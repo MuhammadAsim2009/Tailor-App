@@ -320,6 +320,18 @@ CREATE TABLE payments (
     }
   }
 
+  /// Delete all payment records tied to [customerId] from SQLite and Firestore.
+  Future<void> deletePaymentsByCustomerId(String customerId) async {
+    final db = await instance.database;
+    // Get the payment IDs before deleting so we can remove them from Firestore too
+    final rows = await db.query('payments', columns: ['id'], where: 'customerId = ?', whereArgs: [customerId]);
+    await db.delete('payments', where: 'customerId = ?', whereArgs: [customerId]);
+    // Remove from Firestore
+    for (final row in rows) {
+      FirebaseSyncService.instance.deletePaymentFromFirestore(row['id'] as String);
+    }
+  }
+
   Future<void> insertCustomer(CustomerModel customer) async {
     final db = await instance.database;
     await db.insert('customers', customer.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
@@ -406,6 +418,8 @@ CREATE TABLE payments (
   Future<void> deleteCustomer(String customerId) async {
     final db = await instance.database;
     final now = DateTime.now().toIso8601String();
+    // Delete payment records for all orders of this customer first
+    await deletePaymentsByCustomerId(customerId);
     // Soft-delete all child orders
     await db.update('orders', {'deletedAt': now}, where: 'customerId = ?', whereArgs: [customerId]);
     // Soft-delete the customer
@@ -642,7 +656,14 @@ CREATE TABLE payments (
 
   Future<int> getTotalFamiliesCount() async {
     final db = await instance.database;
-    return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM families')) ?? 0;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM families');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getTotalPaymentsCount() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM payments');
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   // ── Meta Key-Value Store ──────────────────────────────────────────────────

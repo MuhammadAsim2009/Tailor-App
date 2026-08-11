@@ -1159,16 +1159,12 @@ class CustomerProfileScreen extends StatelessWidget {
           if (remainingPayment <= 0) break;
           double balance = o.totalAmount - o.advancePaid;
           if (remainingPayment >= balance) {
-            final updatedOrder = o.copyWith(
-              advancePaid: o.advancePaid + balance,
-            );
-            await controller.updateOrder(updatedOrder);
+            // Pay off this order fully
+            await controller.markOrderAsPaid(o.id, o.advancePaid + balance);
             remainingPayment -= balance;
           } else {
-            final updatedOrder = o.copyWith(
-              advancePaid: o.advancePaid + remainingPayment,
-            );
-            await controller.updateOrder(updatedOrder);
+            // Partial payment on this order
+            await controller.markOrderAsPaid(o.id, o.advancePaid + remainingPayment);
             remainingPayment = 0;
           }
         }
