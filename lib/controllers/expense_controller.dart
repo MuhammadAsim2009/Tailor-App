@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/expense_model.dart';
 import '../services/database_service.dart';
+import 'wallet_controller.dart';
 
 class ExpenseController extends ChangeNotifier {
   final DatabaseService _dbService = DatabaseService.instance;
@@ -36,6 +37,7 @@ class ExpenseController extends ChangeNotifier {
     required double amount,
     required DateTime date,
     String? notes,
+    String walletSource = 'shop',
   }) async {
     String id = _generateExpenseId();
     final expense = ExpenseModel(
@@ -45,10 +47,20 @@ class ExpenseController extends ChangeNotifier {
       amount: amount,
       date: date,
       notes: notes,
+      walletSource: walletSource,
       updatedAt: DateTime.now(),
     );
 
     await _dbService.insertExpense(expense);
+
+    // If paid from the other wallet, record a debit there too
+    if (walletSource == 'other') {
+      await WalletController.instance.debitForExpense(
+        amount,
+        notes: 'Expense: $title',
+      );
+    }
+
     await loadExpenses();
   }
 

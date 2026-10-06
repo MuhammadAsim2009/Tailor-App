@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../controllers/expense_controller.dart';
+import '../controllers/order_controller.dart';
+import '../controllers/wallet_controller.dart';
 import '../models/expense_model.dart';
 
 // ─────────────────────────────────────────────────────────────────
@@ -27,6 +29,7 @@ class EditExpenseScreen extends StatefulWidget {
   final String  expenseCategory;
   final DateTime expenseDate;
   final String  expenseNotes;
+  final String  expenseWalletSource;
 
   const EditExpenseScreen({
     super.key,
@@ -36,6 +39,7 @@ class EditExpenseScreen extends StatefulWidget {
     required this.expenseCategory,
     required this.expenseDate,
     required this.expenseNotes,
+    this.expenseWalletSource = 'shop',
   });
 
   @override
@@ -44,6 +48,7 @@ class EditExpenseScreen extends StatefulWidget {
 
 class _EditExpenseScreenState extends State<EditExpenseScreen> {
   late DateTime _selectedDate;
+  late String _walletSource;
 
   // ── Form controllers — pre-filled with existing data ──
   late final TextEditingController _titleCtrl;
@@ -51,6 +56,8 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
   late final TextEditingController _notesCtrl;
 
   final ExpenseController _controller = ExpenseController();
+  final OrderController _orderController = OrderController();
+  final WalletController _walletController = WalletController.instance;
 
   @override
   void initState() {
@@ -60,10 +67,30 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
     _amountCtrl = TextEditingController(text: widget.expenseAmount.toStringAsFixed(0));
     _notesCtrl  = TextEditingController(text: widget.expenseNotes);
     _selectedDate = widget.expenseDate;
+    _walletSource = widget.expenseWalletSource;
 
     _amountCtrl.addListener(() => setState(() {}));
     _titleCtrl.addListener(() => setState(() {}));
+    _walletController.loadTransactions();
   }
+
+  bool _isSameDay(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  double get _shopProfitBalance {
+    final now = DateTime.now();
+    final todayCollected = _orderController.payments
+        .where((p) => _isSameDay(p.paidAt, now))
+        .fold<double>(0, (sum, p) => sum + p.amount);
+    final todayShopExpenses = _controller.expenses
+        .where((e) => _isSameDay(e.date, now) && e.walletSource != 'other')
+        .fold<double>(0, (sum, e) => sum + e.amount);
+    return todayCollected - todayShopExpenses;
+  }
+
+  double get _otherWalletBalance => _walletController.balance;
 
   @override
   void dispose() {
@@ -118,6 +145,7 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
             amount: _parsedAmount,
             date: _selectedDate,
             notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+            walletSource: _walletSource,
           );
           await _controller.updateExpense(updatedExpense);
 
@@ -169,9 +197,37 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
                 child: _buildDetailsForm(),
               ),
 
+              const SizedBox(height: 16),
+
+              // ── 3. Payment Source ──
+              _buildSectionCard(
+                title: 'Payment Source',
+                child: Column(
+                  children: [
+                    _buildSourceTile(
+                      value: 'shop',
+                      title: 'Shop Profit',
+                      subtitle: 'Deducted from daily shop revenue',
+                      balance: _shopProfitBalance,
+                      icon: Icons.storefront_outlined,
+                      activeColor: _kPrimary,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildSourceTile(
+                      value: 'other',
+                      title: 'Other Wallet',
+                      subtitle: 'Deducted from your other wallet balance',
+                      balance: _otherWalletBalance,
+                      icon: Icons.account_balance_wallet_outlined,
+                      activeColor: _kAccent,
+                    ),
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 32),
 
-              // ── 3. Bottom Buttons ──
+              // ── 4. Bottom Buttons ──
               _buildBottomButtons(),
             ],
           ),
@@ -239,6 +295,114 @@ class _EditExpenseScreenState extends State<EditExpenseScreen> {
           const SizedBox(height: 16),
           child,
         ],
+      ),
+    );
+  }
+
+  Widget _buildSourceTile({
+    required String value,
+    required String title,
+    required String subtitle,
+    required double balance,
+    required IconData icon,
+    required Color activeColor,
+  }) {
+    final isSelected = _walletSource == value;
+    final formattedBalance = NumberFormat('#,##0').format(balance.abs().toInt());
+    final isNegative = balance < 0;
+    final balanceColor = balance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+
+    return InkWell(
+      onTap: () => setState(() => _walletSource = value),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor.withValues(alpha: 0.06) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? activeColor : Colors.grey.shade200,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isSelected ? activeColor.withValues(alpha: 0.12) : Colors.grey.shade100,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 20,
+                color: isSelected ? activeColor : _kTextSec,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color: _kTextPri,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: balanceColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${isNegative ? '-' : ''}PKR $formattedBalance',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: balanceColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Balance: ${isNegative ? '-' : ''}PKR $formattedBalance • $subtitle',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: _kTextSec,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? activeColor : Colors.grey.shade400,
+                  width: 2,
+                ),
+                color: isSelected ? activeColor : Colors.transparent,
+              ),
+              child: isSelected
+                  ? const Center(
+                      child: Icon(Icons.check, size: 13, color: Colors.white),
+                    )
+                  : null,
+            ),
+          ],
+        ),
       ),
     );
   }

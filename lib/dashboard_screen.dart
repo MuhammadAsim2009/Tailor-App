@@ -12,7 +12,9 @@ import 'expenses_screen.dart';
 import '../controllers/order_controller.dart';
 import '../controllers/expense_controller.dart';
 import '../controllers/profile_controller.dart';
+import '../controllers/wallet_controller.dart';
 import '../models/order_model.dart';
+import '../models/wallet_transaction_model.dart';
 import 'services/firebase_sync_service.dart';
 
 // --- Design System Constants ---
@@ -38,6 +40,19 @@ class _DashboardScreenState extends State<DashboardScreen>
   final OrderController _orderController = OrderController();
   final ExpenseController _expenseController = ExpenseController();
   final ProfileController _profileController = ProfileController();
+  final WalletController _walletController = WalletController.instance;
+
+  DateTime _selectedDate = DateTime.now();
+
+  bool _isSameDay(DateTime? a, DateTime b) {
+    if (a == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isSameMonth(DateTime? a, DateTime b) {
+    if (a == null) return false;
+    return a.year == b.year && a.month == b.month;
+  }
 
   void _onStateChanged() {
     if (mounted) setState(() {});
@@ -49,6 +64,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _orderController.addListener(_onStateChanged);
     _expenseController.addListener(_onStateChanged);
     _profileController.addListener(_onStateChanged);
+    _walletController.addListener(_onStateChanged);
     FirebaseSyncService.instance.addListener(_onStateChanged);
   }
 
@@ -57,6 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     _orderController.removeListener(_onStateChanged);
     _expenseController.removeListener(_onStateChanged);
     _profileController.removeListener(_onStateChanged);
+    _walletController.removeListener(_onStateChanged);
     FirebaseSyncService.instance.removeListener(_onStateChanged);
     super.dispose();
   }
@@ -158,7 +175,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
+            _buildOtherWalletCard(),
+            const SizedBox(height: 16),
             _buildTodayIncomeCard(),
             const SizedBox(height: 16),
             _buildKPIGrid(),
@@ -212,9 +231,35 @@ class _DashboardScreenState extends State<DashboardScreen>
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
-              Text(
-                DateFormat('EEEE, d MMM').format(DateTime.now()),
-                style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
+              GestureDetector(
+                onTap: _pickDate,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _isSameDay(_selectedDate, DateTime.now())
+                          ? DateFormat('EEEE, d MMM').format(_selectedDate)
+                          : DateFormat('d MMM yyyy').format(_selectedDate),
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: _isSameDay(_selectedDate, DateTime.now())
+                            ? kTextSecondary
+                            : kPrimaryColor,
+                        fontWeight: _isSameDay(_selectedDate, DateTime.now())
+                            ? FontWeight.normal
+                            : FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 13,
+                      color: _isSameDay(_selectedDate, DateTime.now())
+                          ? kTextSecondary
+                          : kPrimaryColor,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -262,19 +307,114 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  Widget _buildOtherWalletCard() {
+    final walletBalance = _walletController.balance;
+    final isNegative = walletBalance < 0;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF065F46), Color(0xFF059669), Color(0xFF10B981)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(kBorderRadius),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withValues(alpha: 0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _showWalletSheet,
+          borderRadius: BorderRadius.circular(kBorderRadius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.account_balance_wallet_outlined,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Other Wallet',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Rs. ${isNegative ? '-' : ''}${walletBalance.abs().toInt()}',
+                        style: GoogleFonts.inter(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tap to view history & add funds',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTodayIncomeCard() {
-    final now = DateTime.now();
-    bool isToday(DateTime date) {
-      final d = date.toLocal();
-      return d.year == now.year && d.month == now.month && d.day == now.day;
-    }
+    final sel = _selectedDate;
+    final isViewingToday = _isSameDay(sel, DateTime.now());
 
-    // Sum payments that were actually recorded today (from the payments ledger)
-    final totalCollected = _orderController.payments
-        .where((p) => isToday(p.paidAt))
+    // Sum payments that were actually recorded on selected date (from the payments ledger)
+    final dailyIncome = _orderController.payments
+        .where((p) => _isSameDay(p.paidAt, sel))
         .fold<double>(0, (sum, p) => sum + p.amount);
-
-    final dailyIncome = totalCollected;
 
     return Container(
       width: double.infinity,
@@ -298,21 +438,52 @@ class _DashboardScreenState extends State<DashboardScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(
-                Icons.account_balance_wallet_outlined,
-                color: Colors.white70,
-                size: 20,
+              Row(
+                children: [
+                  const Icon(
+                    Icons.account_balance_wallet_outlined,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isViewingToday ? 'Today\'s Income' : 'Income on ${DateFormat('d MMM').format(sel)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                'Today\'s Income',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w500,
+              if (!isViewingToday)
+                GestureDetector(
+                  onTap: () => setState(() => _selectedDate = DateTime.now()),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.today, size: 13, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Today',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -330,55 +501,51 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Widget _buildKPIGrid() {
-    final now = DateTime.now();
-    bool isToday(DateTime date) {
-      final d = date.toLocal();
-      return d.year == now.year && d.month == now.month && d.day == now.day;
-    }
-
-    bool isThisMonth(DateTime date) {
-      final d = date.toLocal();
-      return d.year == now.year && d.month == now.month;
-    }
+    final sel = _selectedDate;
+    final isViewingToday = _isSameDay(_selectedDate, DateTime.now());
 
     // Use payments ledger for accurate daily income tracking
     final todayCollected = _orderController.payments
-        .where((p) => isToday(p.paidAt))
+        .where((p) => _isSameDay(p.paidAt, sel))
         .fold<double>(0, (sum, p) => sum + p.amount);
+    // Only deduct shop expenses from revenue (not other-wallet ones)
     final todayExpensesList = _expenseController.expenses
-        .where((e) => isToday(e.date))
+        .where((e) => _isSameDay(e.date, sel))
         .toList();
-    final todayTotalExpenses = todayExpensesList.fold<double>(
-      0,
-      (sum, e) => sum + e.amount,
-    );
-    final todayRevenue = todayCollected - todayTotalExpenses;
+    final todayShopExpenses = todayExpensesList
+        .where((e) => e.walletSource != 'other')
+        .fold<double>(0, (sum, e) => sum + e.amount);
+    final todayTotalExpenses = todayExpensesList
+        .fold<double>(0, (sum, e) => sum + e.amount);
+    final todayRevenue = todayCollected - todayShopExpenses;
 
     final allOrders = _orderController.orders;
-    final todayOrders = allOrders.where((o) => isToday(o.orderDate)).toList();
-
+    final todayOrders = allOrders.where((o) => _isSameDay(o.orderDate, sel)).toList();
     final total = todayOrders.length;
-    // Keep pending dues as overall since it's cumulative debt
-    final pendingAmount = allOrders.fold<double>(
-      0,
-      (sum, o) => sum + (o.totalAmount - o.advancePaid),
-    );
-    // Completed today
+
+    // Pending dues: cumulative if today, or for the selected date's orders
+    final pendingAmount = isViewingToday
+        ? allOrders.fold<double>(
+            0,
+            (sum, o) => sum + (o.totalAmount - o.advancePaid),
+          )
+        : todayOrders.fold<double>(
+            0,
+            (sum, o) => sum + (o.totalAmount - o.advancePaid),
+          );
+
+    // Completed on selected date
     final completed = allOrders
-        .where((o) => o.status == 'Delivered' && isToday(o.updatedAt))
+        .where((o) => o.status == 'Delivered' && _isSameDay(o.updatedAt, sel))
         .length;
 
     final monthCollected = _orderController.payments
-        .where((p) => isThisMonth(p.paidAt))
+        .where((p) => _isSameMonth(p.paidAt, sel))
         .fold<double>(0, (sum, p) => sum + p.amount);
-    final monthExpenses = _expenseController.expenses
-        .where((e) => isThisMonth(e.date))
-        .toList();
-    final monthTotalExpenses = monthExpenses.fold<double>(
-      0,
-      (sum, e) => sum + e.amount,
-    );
-    final monthRevenue = monthCollected - monthTotalExpenses;
+    final monthShopExpenses = _expenseController.expenses
+        .where((e) => _isSameMonth(e.date, sel) && e.walletSource != 'other')
+        .fold<double>(0, (sum, e) => sum + e.amount);
+    final monthRevenue = monthCollected - monthShopExpenses;
 
     return GridView.count(
       crossAxisCount: 2,
@@ -389,7 +556,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       childAspectRatio: 1.4,
       children: [
         _buildKPICard(
-          title: 'Today\'s Revenue',
+          title: isViewingToday ? 'Today\'s Revenue' : 'Day Revenue',
           value: todayRevenue.toInt(),
           icon: Icons.account_balance_wallet_outlined,
           bgColor: kPrimaryColor,
@@ -397,7 +564,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           isCurrency: true,
         ),
         _buildKPICard(
-          title: 'Today\'s Expenses',
+          title: isViewingToday ? 'Today\'s Expenses' : 'Day Expenses',
           value: todayTotalExpenses.toInt(),
           icon: Icons.money_off_csred_outlined,
           bgColor: kCardColor,
@@ -406,14 +573,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           isCurrency: true,
         ),
         _buildKPICard(
-          title: 'Today\'s Orders',
+          title: isViewingToday ? 'Today\'s Orders' : 'Day Orders',
           value: total,
           icon: Icons.list_alt_outlined,
           bgColor: kPrimaryColor,
           textColor: Colors.white,
         ),
         _buildKPICard(
-          title: 'Pending Dues',
+          title: isViewingToday ? 'Pending Dues' : 'Day Pending Dues',
           value: pendingAmount.toInt(),
           icon: Icons.pending_actions_outlined,
           bgColor: kCardColor,
@@ -422,7 +589,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           isCurrency: true,
         ),
         _buildKPICard(
-          title: 'Completed Today',
+          title: isViewingToday ? 'Completed Today' : 'Completed',
           value: completed,
           icon: Icons.check_circle_outline,
           bgColor: kCardColor,
@@ -430,7 +597,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           iconColor: kAccentColor,
         ),
         _buildKPICard(
-          title: 'Monthly Revenue',
+          title: isViewingToday ? 'Monthly Revenue' : '${DateFormat('MMM yyyy').format(sel)} Revenue',
           value: monthRevenue.toInt(),
           icon: Icons.account_balance_wallet_outlined,
           bgColor: kCardColor,
@@ -442,6 +609,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+
   Widget _buildKPICard({
     required String title,
     required int value,
@@ -450,8 +618,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     required Color textColor,
     Color? iconColor,
     bool isCurrency = false,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final card = Container(
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(kBorderRadius),
@@ -495,6 +664,15 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ),
         ],
+      ),
+    );
+
+    if (onTap == null) return card;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(kBorderRadius),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(onTap: onTap, child: card),
       ),
     );
   }
@@ -785,8 +963,1067 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // Bottom nav replaced by _AnimatedBottomBar widget below
-  // FAB replaced by SpeedDialFAB — see floatingActionButton in build()
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate.isAfter(now) ? now : _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: kPrimaryColor,
+            onPrimary: Colors.white,
+            onSurface: kPrimaryColor,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  void _showWalletSheet() {
+    DateTimeRange? selectedRange;
+    String activeFilter = 'All'; // 'All', 'Today', 'This Week', 'This Month', 'Custom'
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final now = DateTime.now();
+            final allTxns = _walletController.transactions
+                .where((t) => t.deletedAt == null)
+                .toList();
+
+            final txns = allTxns.where((t) {
+              if (activeFilter == 'All') return true;
+              final d = t.date.toLocal();
+              if (activeFilter == 'Today') {
+                return d.year == now.year && d.month == now.month && d.day == now.day;
+              } else if (activeFilter == 'This Week') {
+                final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+                final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+                return d.isAfter(start.subtract(const Duration(seconds: 1)));
+              } else if (activeFilter == 'This Month') {
+                return d.year == now.year && d.month == now.month;
+              } else if (activeFilter == 'Custom' && selectedRange != null) {
+                final start = DateTime(
+                  selectedRange!.start.year,
+                  selectedRange!.start.month,
+                  selectedRange!.start.day,
+                );
+                final end = DateTime(
+                  selectedRange!.end.year,
+                  selectedRange!.end.month,
+                  selectedRange!.end.day,
+                  23,
+                  59,
+                  59,
+                );
+                return d.isAfter(start.subtract(const Duration(seconds: 1))) &&
+                    d.isBefore(end.add(const Duration(seconds: 1)));
+              }
+              return true;
+            }).toList()
+              ..sort((a, b) => b.date.compareTo(a.date));
+
+            final balance = _walletController.balance;
+
+            final periodCredits = txns
+                .where((t) => t.type == 'credit')
+                .fold<double>(0, (sum, t) => sum + t.amount);
+            final periodDebits = txns
+                .where((t) => t.type == 'debit')
+                .fold<double>(0, (sum, t) => sum + t.amount);
+
+            Future<void> pickCustomRange() async {
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+                initialDateRange: selectedRange ??
+                    DateTimeRange(
+                      start: DateTime.now().subtract(const Duration(days: 7)),
+                      end: DateTime.now(),
+                    ),
+                builder: (pickerCtx, child) => Theme(
+                  data: Theme.of(pickerCtx).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: kPrimaryColor,
+                      onPrimary: Colors.white,
+                      onSurface: kPrimaryColor,
+                    ),
+                  ),
+                  child: child!,
+                ),
+              );
+              if (picked != null) {
+                setSheetState(() {
+                  selectedRange = picked;
+                  activeFilter = 'Custom';
+                });
+              }
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Other Wallet',
+                              style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: kPrimaryColor,
+                              ),
+                            ),
+                            Text(
+                              'Separate funds & expense tracking',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: kTextSecondary),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Balance Card + Add Money Button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1E3A5F), Color(0xFF0F172A)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Current Balance',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'PKR ${balance.toInt()}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _showAddMoneyDialog(ctx, () {
+                                setSheetState(() {});
+                                setState(() {});
+                              });
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: Text(
+                              'Add Money',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Date Range Filter Bar
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        _buildWalletFilterChip(
+                          label: 'All',
+                          isSelected: activeFilter == 'All',
+                          onTap: () => setSheetState(() => activeFilter = 'All'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildWalletFilterChip(
+                          label: 'Today',
+                          isSelected: activeFilter == 'Today',
+                          onTap: () => setSheetState(() => activeFilter = 'Today'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildWalletFilterChip(
+                          label: 'This Week',
+                          isSelected: activeFilter == 'This Week',
+                          onTap: () => setSheetState(() => activeFilter = 'This Week'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildWalletFilterChip(
+                          label: 'This Month',
+                          isSelected: activeFilter == 'This Month',
+                          onTap: () => setSheetState(() => activeFilter = 'This Month'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildWalletFilterChip(
+                          label: activeFilter == 'Custom' && selectedRange != null
+                              ? '${DateFormat('d MMM').format(selectedRange!.start)} - ${DateFormat('d MMM').format(selectedRange!.end)}'
+                              : 'Custom Range 📅',
+                          isSelected: activeFilter == 'Custom',
+                          icon: Icons.date_range,
+                          onTap: pickCustomRange,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (activeFilter != 'All') ...[
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              'In: +PKR ${periodCredits.toInt()}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF10B981),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              'Out: -PKR ${periodDebits.toInt()}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red,
+                              ),
+                            ),
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: () => setSheetState(() {
+                                activeFilter = 'All';
+                                selectedRange = null;
+                              }),
+                              child: Text(
+                                'Clear',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: kPrimaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Transaction History (Ledger)',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: kPrimaryColor,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${txns.length} records',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: kTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: txns.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.receipt_long_outlined,
+                                  size: 48,
+                                  color: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  activeFilter == 'All'
+                                      ? 'No transactions yet'
+                                      : 'No transactions for this date range',
+                                  style: GoogleFonts.inter(
+                                    color: kTextSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            itemCount: txns.length,
+                            separatorBuilder: (context, index) => Divider(
+                              height: 1,
+                              color: Colors.grey.shade100,
+                            ),
+                            itemBuilder: (context, index) {
+                              final t = txns[index];
+                              final isCredit = t.type == 'credit';
+                              return ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: isCredit
+                                        ? const Color(0xFF10B981).withValues(alpha: 0.1)
+                                        : Colors.red.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    isCredit
+                                        ? Icons.arrow_downward
+                                        : Icons.arrow_upward,
+                                    color: isCredit
+                                        ? const Color(0xFF10B981)
+                                        : Colors.red,
+                                    size: 20,
+                                  ),
+                                ),
+                                title: Text(
+                                  isCredit
+                                      ? (t.notes?.isNotEmpty == true
+                                          ? t.notes!
+                                          : 'Deposit / Added')
+                                      : (t.notes?.isNotEmpty == true
+                                          ? t.notes!
+                                          : 'Expense / Debit'),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: kTextPrimary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  DateFormat('d MMM yyyy, hh:mm a').format(t.date),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: kTextSecondary,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${isCredit ? '+' : '-'} PKR ${t.amount.toInt()}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: isCredit
+                                            ? const Color(0xFF10B981)
+                                            : Colors.red,
+                                      ),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert, size: 20, color: kTextSecondary),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      onSelected: (action) {
+                                        if (action == 'edit') {
+                                          _showEditWalletTransactionDialog(ctx, t, () {
+                                            setSheetState(() {});
+                                            setState(() {});
+                                          });
+                                        } else if (action == 'delete') {
+                                          _showDeleteWalletTransactionDialog(ctx, t, () {
+                                            setSheetState(() {});
+                                            setState(() {});
+                                          });
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.edit_outlined, size: 18, color: kPrimaryColor),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Edit',
+                                                style: GoogleFonts.inter(fontSize: 13, color: kTextPrimary),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Delete',
+                                                style: GoogleFonts.inter(fontSize: 13, color: Colors.red),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildWalletFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? kPrimaryColor : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? kPrimaryColor : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 13,
+                color: isSelected ? Colors.white : kTextSecondary,
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: isSelected ? Colors.white : kTextSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddMoneyDialog(BuildContext parentContext, VoidCallback onAdded) {
+    final amountCtrl = TextEditingController();
+    final notesCtrl = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+
+    showDialog(
+      context: parentContext,
+      builder: (ctx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Add Money to Other Wallet',
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              color: kPrimaryColor,
+              fontSize: 18,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Amount (PKR)',
+                    hintText: 'e.g. 5000',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixText: 'PKR ',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Transaction Date',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: parentContext,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                    );
+                    if (picked != null) {
+                      setDialogState(() {
+                        selectedDate = DateTime(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                          selectedDate.hour,
+                          selectedDate.minute,
+                        );
+                      });
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 18, color: kPrimaryColor),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            DateFormat('d MMM yyyy, hh:mm a').format(selectedDate),
+                            style: GoogleFonts.inter(fontSize: 14, color: kTextPrimary),
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down, color: kTextSecondary),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: notesCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Notes / Description (Optional)',
+                    hintText: 'e.g. Personal savings deposit',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.inter(color: kTextSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amt = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                if (amt <= 0) return;
+                await _walletController.addMoney(
+                  amt,
+                  notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                  date: selectedDate,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+                onAdded();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                'Add',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditWalletTransactionDialog(
+    BuildContext parentContext,
+    WalletTransactionModel txn,
+    VoidCallback onUpdated,
+  ) {
+    final amountController = TextEditingController(
+      text: txn.amount % 1 == 0 ? txn.amount.toInt().toString() : txn.amount.toString(),
+    );
+    final notesController = TextEditingController(text: txn.notes ?? '');
+    String selectedType = txn.type;
+    DateTime selectedDate = txn.date;
+
+    showDialog(
+      context: parentContext,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: kPrimaryColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.edit_note, color: kPrimaryColor, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Edit Transaction',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: kPrimaryColor,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Type selector
+                    Text(
+                      'Transaction Type',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => selectedType = 'credit'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: selectedType == 'credit'
+                                    ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                                    : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: selectedType == 'credit'
+                                      ? const Color(0xFF10B981)
+                                      : Colors.transparent,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_downward,
+                                    size: 16,
+                                    color: selectedType == 'credit'
+                                        ? const Color(0xFF10B981)
+                                        : kTextSecondary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Deposit (+)',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: selectedType == 'credit'
+                                          ? const Color(0xFF10B981)
+                                          : kTextSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setDialogState(() => selectedType = 'debit'),
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: selectedType == 'debit'
+                                    ? Colors.red.withValues(alpha: 0.15)
+                                    : Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: selectedType == 'debit'
+                                      ? Colors.red
+                                      : Colors.transparent,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.arrow_upward,
+                                    size: 16,
+                                    color: selectedType == 'debit'
+                                        ? Colors.red
+                                        : kTextSecondary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Expense (-)',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: selectedType == 'debit'
+                                          ? Colors.red
+                                          : kTextSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // Amount Input
+                    Text(
+                      'Amount (PKR)',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        hintText: 'Enter amount',
+                        prefixIcon: const Icon(Icons.payments_outlined, color: kPrimaryColor, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: kPrimaryColor, width: 1.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Date Picker Tile
+                    Text(
+                      'Date & Time',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setDialogState(() {
+                            selectedDate = DateTime(
+                              picked.year,
+                              picked.month,
+                              picked.day,
+                              selectedDate.hour,
+                              selectedDate.minute,
+                            );
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today, size: 18, color: kPrimaryColor),
+                            const SizedBox(width: 10),
+                            Text(
+                              DateFormat('d MMM yyyy, hh:mm a').format(selectedDate),
+                              style: GoogleFonts.inter(fontSize: 14, color: kTextPrimary),
+                            ),
+                            const Spacer(),
+                            const Icon(Icons.arrow_drop_down, color: kTextSecondary),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Notes Input
+                    Text(
+                      'Description / Notes',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g. Added personal cash',
+                        prefixIcon: const Icon(Icons.notes_outlined, color: kPrimaryColor, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: kPrimaryColor, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.inter(color: kTextSecondary),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final amt = double.tryParse(amountController.text.trim());
+                    if (amt == null || amt <= 0) {
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a valid amount'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                    final updated = txn.copyWith(
+                      amount: amt,
+                      type: selectedType,
+                      date: selectedDate,
+                      notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                    );
+                    Navigator.pop(dialogCtx);
+                    await _walletController.updateTransaction(updated);
+                    onUpdated();
+                    if (parentContext.mounted) {
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
+                        const SnackBar(
+                          content: Text('Transaction updated successfully!'),
+                          backgroundColor: Color(0xFF10B981),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text('Save', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteWalletTransactionDialog(
+    BuildContext parentContext,
+    WalletTransactionModel txn,
+    VoidCallback onDeleted,
+  ) {
+    showDialog(
+      context: parentContext,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Delete Transaction',
+              style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete this ${txn.type == 'credit' ? 'deposit' : 'expense'} transaction of PKR ${txn.amount.toInt()}?',
+          style: GoogleFonts.inter(fontSize: 14, color: kTextSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text('Cancel', style: GoogleFonts.inter(color: kTextSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await _walletController.deleteTransaction(txn.id);
+              onDeleted();
+              if (parentContext.mounted) {
+                ScaffoldMessenger.of(parentContext).showSnackBar(
+                  const SnackBar(
+                    content: Text('Transaction deleted'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text('Delete', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
 
   // --- Skeletons ---
 

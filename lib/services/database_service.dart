@@ -5,6 +5,7 @@ import '../models/customer_model.dart';
 import '../models/family_model.dart';
 import '../models/expense_model.dart';
 import '../models/payment_model.dart';
+import '../models/wallet_transaction_model.dart';
 import 'firebase_sync_service.dart';
 
 class DatabaseService {
@@ -25,7 +26,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 13,
+      version: 14,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -180,6 +181,24 @@ CREATE TABLE IF NOT EXISTS payments (
         }
       } catch (_) {}
     }
+    if (oldVersion < 14) {
+      try {
+        await db.execute('ALTER TABLE expenses ADD COLUMN walletSource TEXT DEFAULT \'shop\';');
+      } catch (_) {}
+      try {
+        await db.execute('''
+CREATE TABLE IF NOT EXISTS wallet_transactions (
+  id TEXT PRIMARY KEY,
+  amount REAL NOT NULL,
+  type TEXT NOT NULL,
+  date TEXT NOT NULL,
+  notes TEXT,
+  updatedAt TEXT,
+  deletedAt TEXT
+)
+''');
+      } catch (_) {}
+    }
   }
 
   Future _createDB(Database db, int version) async {
@@ -226,6 +245,7 @@ CREATE TABLE expenses (
   amount REAL NOT NULL,
   date TEXT NOT NULL,
   notes TEXT,
+  walletSource TEXT DEFAULT 'shop',
   updatedAt TEXT,
   deletedAt TEXT
 )
@@ -278,6 +298,18 @@ CREATE TABLE payments (
   customerId TEXT NOT NULL,
   amount REAL NOT NULL,
   paidAt TEXT NOT NULL
+)
+''');
+
+    await db.execute('''
+CREATE TABLE wallet_transactions (
+  id TEXT PRIMARY KEY,
+  amount REAL NOT NULL,
+  type TEXT NOT NULL,
+  date TEXT NOT NULL,
+  notes TEXT,
+  updatedAt TEXT,
+  deletedAt TEXT
 )
 ''');
   }
@@ -638,6 +670,62 @@ CREATE TABLE payments (
     FirebaseSyncService.instance.syncProfile(profileMap);
   }
 
+  // ── Wallet Transactions CRUD ──────────────────────────────────────────────
+
+  Future<void> insertWalletTransaction(WalletTransactionModel txn) async {
+    final db = await instance.database;
+    await db.insert('wallet_transactions', txn.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+    FirebaseSyncService.instance.syncWalletTransaction(txn);
+  }
+
+  Future<void> updateWalletTransaction(WalletTransactionModel txn) async {
+    final db = await instance.database;
+    await db.update(
+      'wallet_transactions',
+      txn.toMap(),
+      where: 'id = ?',
+      whereArgs: [txn.id],
+    );
+    FirebaseSyncService.instance.syncWalletTransaction(txn);
+  }
+
+  Future<void> deleteWalletTransaction(String id) async {
+    final db = await instance.database;
+    final now = DateTime.now().toIso8601String();
+    await db.update(
+      'wallet_transactions',
+      {'deletedAt': now, 'updatedAt': now},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    final rows = await db.query('wallet_transactions', where: 'id = ?', whereArgs: [id]);
+    if (rows.isNotEmpty) {
+      FirebaseSyncService.instance.syncWalletTransaction(WalletTransactionModel.fromMap(rows.first));
+    }
+  }
+
+  Future<void> purgeWalletTransaction(String id) async {
+    final db = await instance.database;
+    await db.delete('wallet_transactions', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<List<WalletTransactionModel>> getAllWalletTransactions() async {
+    final db = await instance.database;
+    final result = await db.query(
+      'wallet_transactions',
+      where: 'deletedAt IS NULL',
+      orderBy: 'date DESC',
+    );
+    return result.map((json) => WalletTransactionModel.fromMap(json)).toList();
+  }
+
+  Future<List<WalletTransactionModel>> getSyncWalletTransactions() async {
+    final db = await instance.database;
+    final result = await db.query('wallet_transactions');
+    return result.map((json) => WalletTransactionModel.fromMap(json)).toList();
+  }
+
   // ── Raw Total Counts for Metadata (includes soft-deleted) ─────────────────
   Future<int> getTotalCustomersCount() async {
     final db = await instance.database;
@@ -663,6 +751,12 @@ CREATE TABLE payments (
   Future<int> getTotalPaymentsCount() async {
     final db = await instance.database;
     final result = await db.rawQuery('SELECT COUNT(*) as count FROM payments');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getTotalWalletTransactionsCount() async {
+    final db = await instance.database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM wallet_transactions');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 

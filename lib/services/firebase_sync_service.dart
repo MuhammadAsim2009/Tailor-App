@@ -6,10 +6,12 @@ import '../models/order_model.dart';
 import '../models/expense_model.dart';
 import '../models/family_model.dart';
 import '../models/payment_model.dart';
+import '../models/wallet_transaction_model.dart';
 import '../models/profile_model.dart';
 import '../controllers/order_controller.dart';
 import '../controllers/expense_controller.dart';
 import '../controllers/profile_controller.dart';
+import '../controllers/wallet_controller.dart';
 import 'database_service.dart';
 import 'dart:async';
 import 'dart:developer';
@@ -174,6 +176,36 @@ class FirebaseSyncService extends ChangeNotifier {
     });
   }
 
+  void syncWalletTransaction(WalletTransactionModel txn) {
+    _startOp();
+    if (txn.deletedAt != null) {
+      _firestore.collection('wallet_transactions').doc(txn.id).delete().then((_) {
+        DatabaseService.instance.purgeWalletTransaction(txn.id);
+        _finishOp();
+      }).catchError((e) {
+        log('Error deleting wallet transaction from firestore: $e');
+        _finishOp(error: true);
+      });
+    } else {
+      _firestore.collection('wallet_transactions').doc(txn.id).set(txn.toFirestore()).then((_) {
+        _finishOp();
+      }).catchError((e) {
+        log('Error syncing wallet transaction: $e');
+        _finishOp(error: true);
+      });
+    }
+  }
+
+  void deleteWalletTransactionFromFirestore(String id) {
+    _startOp();
+    _firestore.collection('wallet_transactions').doc(id).delete().then((_) {
+      _finishOp();
+    }).catchError((e) {
+      log('Error deleting wallet transaction from firestore: $e');
+      _finishOp(error: true);
+    });
+  }
+
   void syncProfile(Map<String, dynamic> profileMap) {
     _startOp();
     final profile = ProfileModel.fromMap(profileMap);
@@ -221,6 +253,7 @@ class FirebaseSyncService extends ChangeNotifier {
       int cloudExpensesCount = 0;
       int cloudFamiliesCount = 0;
       int cloudPaymentsCount = 0;
+      int cloudWalletTransactionsCount = 0;
       
       if (metaDoc.exists) {
         final data = metaDoc.data()!;
@@ -229,6 +262,7 @@ class FirebaseSyncService extends ChangeNotifier {
         cloudExpensesCount = data['expensesCount'] ?? 0;
         cloudFamiliesCount = data['familiesCount'] ?? 0;
         cloudPaymentsCount = data['paymentsCount'] ?? 0;
+        cloudWalletTransactionsCount = data['walletTransactionsCount'] ?? 0;
       }
 
       final localCustomersCount = await dbService.getTotalCustomersCount();
@@ -236,10 +270,11 @@ class FirebaseSyncService extends ChangeNotifier {
       final localExpensesCount = await dbService.getTotalExpensesCount();
       final localFamiliesCount = await dbService.getTotalFamiliesCount();
       final localPaymentsCount = await dbService.getTotalPaymentsCount();
+      final localWalletTransactionsCount = await dbService.getTotalWalletTransactionsCount();
 
       log('--- Richness Check ---');
-      log('Local DB  -> Customers: $localCustomersCount | Orders: $localOrdersCount | Expenses: $localExpensesCount | Families: $localFamiliesCount | Payments: $localPaymentsCount');
-      log('Firebase  -> Customers: $cloudCustomersCount | Orders: $cloudOrdersCount | Expenses: $cloudExpensesCount | Families: $cloudFamiliesCount | Payments: $cloudPaymentsCount');
+      log('Local DB  -> Customers: $localCustomersCount | Orders: $localOrdersCount | Expenses: $localExpensesCount | Families: $localFamiliesCount | Payments: $localPaymentsCount | WalletTxns: $localWalletTransactionsCount');
+      log('Firebase  -> Customers: $cloudCustomersCount | Orders: $cloudOrdersCount | Expenses: $cloudExpensesCount | Families: $cloudFamiliesCount | Payments: $cloudPaymentsCount | WalletTxns: $cloudWalletTransactionsCount');
       
       if (localOrdersCount == 0 && cloudOrdersCount > 0) {
         log('Condition met: SQLite local DB is empty/deleted, Firebase is richer. Pulling all data from Firebase.');
@@ -259,6 +294,7 @@ class FirebaseSyncService extends ChangeNotifier {
       await _syncExpensesCollection(dbService, sqldb, lastSyncAt);
       await _syncFamiliesCollection(dbService, sqldb, lastSyncAt);
       await _syncPaymentsCollection(dbService, sqldb);
+      await _syncWalletTransactionsCollection(dbService, sqldb, lastSyncAt);
 
       await dbService.saveLastSyncAt(syncStartedAt);
 
@@ -270,6 +306,7 @@ class FirebaseSyncService extends ChangeNotifier {
         'expensesCount': await dbService.getTotalExpensesCount(),
         'familiesCount': await dbService.getTotalFamiliesCount(),
         'paymentsCount': await dbService.getTotalPaymentsCount(),
+        'walletTransactionsCount': await dbService.getTotalWalletTransactionsCount(),
         'globalLastUpdatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -278,6 +315,7 @@ class FirebaseSyncService extends ChangeNotifier {
         OrderController().loadData(),
         ExpenseController().loadExpenses(),
         ProfileController().loadProfile(),
+        WalletController.instance.loadTransactions(),
       ]);
 
       log('Two-way sync completed. New anchor: $syncStartedAt');
@@ -308,6 +346,7 @@ class FirebaseSyncService extends ChangeNotifier {
       final expensesSnap  = await _firestore.collection('expenses').get();
       final familiesSnap  = await _firestore.collection('families').get();
       final paymentsSnap  = await _firestore.collection('payments').get();
+      final walletTxnSnap = await _firestore.collection('wallet_transactions').get();
 
       log('--- FORCE PULL: Wiping local SQLite tables ---');
       await sqldb.transaction((txn) async {
@@ -317,6 +356,7 @@ class FirebaseSyncService extends ChangeNotifier {
         await txn.delete('expenses');
         await txn.delete('families');
         await txn.delete('payments');
+        await txn.delete('wallet_transactions');
         
         log('--- FORCE PULL: Inserting Firebase data into SQLite ---');
         if (profileSnap.docs.isNotEmpty) {
@@ -343,6 +383,10 @@ class FirebaseSyncService extends ChangeNotifier {
           final payment = PaymentModel.fromMap(doc.data());
           await txn.insert('payments', payment.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
         }
+        for (var doc in walletTxnSnap.docs) {
+          final wTxn = WalletTransactionModel.fromFirestore(doc.data());
+          await txn.insert('wallet_transactions', wTxn.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+        }
       });
 
       await dbService.saveLastSyncAt(DateTime.now());
@@ -352,6 +396,7 @@ class FirebaseSyncService extends ChangeNotifier {
         OrderController().loadData(),
         ExpenseController().loadExpenses(),
         ProfileController().loadProfile(),
+        WalletController.instance.loadTransactions(),
       ]);
 
       log('Force pull completed. SQLite overwritten successfully.');
@@ -666,6 +711,65 @@ class FirebaseSyncService extends ChangeNotifier {
         } catch (e) {
           log('Error parsing Payment ${entry.key} from cloud: $e');
         }
+      }
+    }
+  }
+
+  Future<void> _syncWalletTransactionsCollection(
+      DatabaseService dbService, Database sqldb, DateTime? lastSyncAt) async {
+    final cloudSnapshot = await _firestore.collection('wallet_transactions').get();
+    final localRecords = await dbService.getSyncWalletTransactions();
+
+    final cloudMap = <String, WalletTransactionModel>{};
+    for (var doc in cloudSnapshot.docs) {
+      try {
+        cloudMap[doc.id] = WalletTransactionModel.fromFirestore(doc.data());
+      } catch (e) {
+        log('Error parsing WalletTransaction ${doc.id} from cloud: $e');
+      }
+    }
+    final localMap = {for (var record in localRecords) record.id: record};
+
+    final allIds = <String>{...cloudMap.keys, ...localMap.keys};
+
+    for (final id in allIds) {
+      try {
+        final cloud = cloudMap[id];
+        final local = localMap[id];
+
+        if (cloud != null && local != null) {
+          final takeCloud = _cloudWins(cloud.updatedAt, local.updatedAt, lastSyncAt);
+          final winner = takeCloud ? cloud : local;
+
+          if (takeCloud) {
+            log('WalletTransaction $id: pulling from cloud');
+            await sqldb.update('wallet_transactions', cloud.toMap(), where: 'id = ?', whereArgs: [id]);
+          } else {
+            log('WalletTransaction $id: pushing local to cloud');
+            await _firestore.collection('wallet_transactions').doc(id).set(local.toFirestore());
+          }
+
+          if (winner.deletedAt != null) {
+            await _firestore.collection('wallet_transactions').doc(id).delete();
+            await dbService.purgeWalletTransaction(id);
+          }
+        } else if (cloud != null && local == null) {
+          if (cloud.deletedAt == null) {
+            log('WalletTransaction $id: new from cloud, inserting locally');
+            await sqldb.insert('wallet_transactions', cloud.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+          } else {
+            await _firestore.collection('wallet_transactions').doc(id).delete();
+          }
+        } else if (cloud == null && local != null) {
+          if (local.deletedAt == null) {
+            log('WalletTransaction $id: local only, pushing to cloud');
+            await _firestore.collection('wallet_transactions').doc(id).set(local.toFirestore());
+          } else {
+            await dbService.purgeWalletTransaction(id);
+          }
+        }
+      } catch (e) {
+        log('Failed to sync wallet transaction $id: $e');
       }
     }
   }

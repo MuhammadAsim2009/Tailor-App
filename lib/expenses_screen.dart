@@ -85,12 +85,13 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
       context,
       PageRouteBuilder(
         pageBuilder: (_, animation, secondaryAnimation) => EditExpenseScreen(
-          expenseId:       exp.id,
-          expenseTitle:    exp.title,
-          expenseAmount:   exp.amount,
-          expenseCategory: exp.category,
-          expenseDate:     exp.date,
-          expenseNotes:    exp.notes ?? '',
+          expenseId:           exp.id,
+          expenseTitle:        exp.title,
+          expenseAmount:       exp.amount,
+          expenseCategory:     exp.category,
+          expenseDate:         exp.date,
+          expenseNotes:        exp.notes ?? '',
+          expenseWalletSource: exp.walletSource,
         ),
         transitionsBuilder: (_, animation, secondaryAnimation, child) => SlideTransition(
           position: Tween<Offset>(
