@@ -7,6 +7,7 @@ import 'edit_expense_screen.dart';
 import '../models/expense_model.dart';
 import '../controllers/expense_controller.dart';
 import '../controllers/order_controller.dart';
+import '../services/backup_export_service.dart';
 
 // --- Design System Constants ---
 const Color kPrimary = Color(0xFF1E3A5F);
@@ -78,6 +79,18 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
 
 
 
+
+  void _showExportPdfSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ExportPdfBottomSheet(
+        allExpenses: _controller.expenses,
+        currentMonth: _currentMonth,
+      ),
+    );
+  }
 
   // ── Navigate to Edit Expense screen ──
   void _navigateToEdit(ExpenseModel exp) {
@@ -185,6 +198,11 @@ class _ExpenseScreenState extends State<ExpenseScreen> with SingleTickerProvider
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined, color: kPrimary),
+            tooltip: 'Export PDF',
+            onPressed: _showExportPdfSheet,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_outlined, color: kPrimary),
             onPressed: () => _controller.loadExpenses(),
@@ -1113,6 +1131,625 @@ class _DeleteConfirmationDialog extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  _ExportPdfBottomSheet
+// ─────────────────────────────────────────────────────────────────
+class _ExportPdfBottomSheet extends StatefulWidget {
+  final List<ExpenseModel> allExpenses;
+  final DateTime currentMonth;
+
+  const _ExportPdfBottomSheet({
+    required this.allExpenses,
+    required this.currentMonth,
+  });
+
+  @override
+  State<_ExportPdfBottomSheet> createState() => _ExportPdfBottomSheetState();
+}
+
+class _ExportPdfBottomSheetState extends State<_ExportPdfBottomSheet> {
+  String _selectedRange = 'This Month'; // 'This Month', 'Today', 'This Week', 'All Time', 'Custom'
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
+  String _selectedCategory = 'All';
+  String _selectedSource = 'All'; // 'All', 'Shop Profit', 'Other Wallet'
+  bool _isExporting = false;
+
+  final List<String> _rangeOptions = [
+    'This Month',
+    'Today',
+    'This Week',
+    'All Time',
+    'Custom',
+  ];
+
+  final List<String> _categories = [
+    'All',
+    'Rent',
+    'Electricity',
+    'Material',
+    'Salary',
+    'Maintenance',
+    'Other',
+  ];
+
+  final List<String> _sourceOptions = [
+    'All',
+    'Shop Profit',
+    'Other Wallet',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _customStartDate = DateTime(widget.currentMonth.year, widget.currentMonth.month, 1);
+    _customEndDate = DateTime.now();
+  }
+
+  List<ExpenseModel> _getFilteredExpenses() {
+    final now = DateTime.now();
+    return widget.allExpenses.where((e) {
+      final d = e.date.toLocal();
+
+      // 1. Date Range
+      if (_selectedRange == 'This Month') {
+        if (d.year != widget.currentMonth.year || d.month != widget.currentMonth.month) {
+          return false;
+        }
+      } else if (_selectedRange == 'Today') {
+        if (d.year != now.year || d.month != now.month || d.day != now.day) {
+          return false;
+        }
+      } else if (_selectedRange == 'This Week') {
+        final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+        final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+        final end = start.add(const Duration(days: 7));
+        if (d.isBefore(start) || d.isAfter(end)) return false;
+      } else if (_selectedRange == 'Custom') {
+        if (_customStartDate != null) {
+          final start = DateTime(
+            _customStartDate!.year,
+            _customStartDate!.month,
+            _customStartDate!.day,
+          );
+          if (d.isBefore(start)) return false;
+        }
+        if (_customEndDate != null) {
+          final end = DateTime(
+            _customEndDate!.year,
+            _customEndDate!.month,
+            _customEndDate!.day,
+            23,
+            59,
+            59,
+          );
+          if (d.isAfter(end)) return false;
+        }
+      }
+
+      // 2. Category
+      if (_selectedCategory != 'All') {
+        final cleanCat = _selectedCategory.contains(' ')
+            ? _selectedCategory.split(' ').skip(1).join(' ')
+            : _selectedCategory;
+        if (e.category.toLowerCase() != cleanCat.toLowerCase()) return false;
+      }
+
+      // 3. Wallet source
+      if (_selectedSource == 'Shop Profit') {
+        if (e.walletSource == 'other') return false;
+      } else if (_selectedSource == 'Other Wallet') {
+        if (e.walletSource != 'other') return false;
+      }
+
+      return true;
+    }).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  String _getPeriodTitle() {
+    if (_selectedRange == 'This Month') {
+      return DateFormat('MMMM yyyy').format(widget.currentMonth);
+    } else if (_selectedRange == 'Today') {
+      return DateFormat('d MMM yyyy').format(DateTime.now());
+    } else if (_selectedRange == 'This Week') {
+      return 'This Week';
+    } else if (_selectedRange == 'All Time') {
+      return 'All Time';
+    } else if (_selectedRange == 'Custom') {
+      final s = _customStartDate != null
+          ? DateFormat('d MMM yyyy').format(_customStartDate!)
+          : 'Start';
+      final e = _customEndDate != null
+          ? DateFormat('d MMM yyyy').format(_customEndDate!)
+          : 'End';
+      return '$s - $e';
+    }
+    return _selectedRange;
+  }
+
+  Future<void> _handleExport() async {
+    final filtered = _getFilteredExpenses();
+    if (filtered.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No expenses match the selected filters.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isExporting = true);
+    try {
+      final period = _getPeriodTitle();
+      final cat = _selectedCategory == 'All' ? null : _selectedCategory;
+      final src = _selectedSource == 'All' ? null : _selectedSource;
+
+      Navigator.pop(context); // Close bottom sheet
+      await BackupExportService.exportExpensesToPDF(
+        context,
+        expenses: filtered,
+        periodTitle: period,
+        categoryFilter: cat,
+        walletSourceFilter: src,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _getFilteredExpenses();
+    final totalAmount = filtered.fold<double>(0.0, (sum, e) => sum + e.amount);
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: kCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        14,
+        20,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Sheet Header
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.picture_as_pdf_rounded,
+                      color: Colors.red.shade700,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Export Expenses PDF',
+                          style: GoogleFonts.inter(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: kPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Filter by date range, category, or wallet',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: kTextSec,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: kTextSec),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Date Range Section
+              Text(
+                'Date Range',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _rangeOptions.map((opt) {
+                  final isSel = _selectedRange == opt;
+                  return ChoiceChip(
+                    label: Text(
+                      opt == 'This Month'
+                          ? DateFormat('MMM yyyy').format(widget.currentMonth)
+                          : opt,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                        color: isSel ? Colors.white : kTextPri,
+                      ),
+                    ),
+                    selected: isSel,
+                    selectedColor: kPrimary,
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    showCheckmark: false,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                        color: isSel ? kPrimary : Colors.transparent,
+                      ),
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _selectedRange = opt);
+                    },
+                  );
+                }).toList(),
+              ),
+
+              // Custom Date Pickers
+              if (_selectedRange == 'Custom') ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _customStartDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setState(() => _customStartDate = picked);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xFFF8FAFC),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'From Date',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: kTextSec,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_month_outlined,
+                                    size: 15,
+                                    color: kPrimary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _customStartDate != null
+                                        ? DateFormat('dd MMM yyyy')
+                                            .format(_customStartDate!)
+                                        : 'Select',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: kPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _customEndDate ?? DateTime.now(),
+                            firstDate: _customStartDate ?? DateTime(2020),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) {
+                            setState(() => _customEndDate = picked);
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade300),
+                            borderRadius: BorderRadius.circular(10),
+                            color: const Color(0xFFF8FAFC),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'To Date',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: kTextSec,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_month_outlined,
+                                    size: 15,
+                                    color: kPrimary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _customEndDate != null
+                                        ? DateFormat('dd MMM yyyy')
+                                            .format(_customEndDate!)
+                                        : 'Select',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: kPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 18),
+
+              // Category Section
+              Text(
+                'Category',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: _categories.map((cat) {
+                    final isSel = _selectedCategory == cat;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(
+                          cat,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                            color: isSel ? Colors.white : kTextPri,
+                          ),
+                        ),
+                        selected: isSel,
+                        selectedColor: kPrimary,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        showCheckmark: false,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          side: BorderSide(
+                            color: isSel ? kPrimary : Colors.transparent,
+                          ),
+                        ),
+                        onSelected: (val) {
+                          if (val) setState(() => _selectedCategory = cat);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Payment / Wallet Source Section
+              Text(
+                'Payment Source',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _sourceOptions.map((src) {
+                  final isSel = _selectedSource == src;
+                  return ChoiceChip(
+                    label: Text(
+                      src,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                        color: isSel ? Colors.white : kTextPri,
+                      ),
+                    ),
+                    selected: isSel,
+                    selectedColor: kPrimary,
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    showCheckmark: false,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                        color: isSel ? kPrimary : Colors.transparent,
+                      ),
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _selectedSource = src);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+
+              // Matching Summary Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFDCFCE7),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF16A34A),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Matching: ${filtered.length} expense${filtered.length == 1 ? '' : 's'}',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: const Color(0xFF15803D),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Total Amount: PKR ${NumberFormat('#,###').format(totalAmount)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF166534),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Export Button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: _isExporting ? null : _handleExport,
+                  icon: _isExporting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.picture_as_pdf_outlined),
+                  label: Text(
+                    _isExporting ? 'Generating PDF...' : 'Generate & Export PDF',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

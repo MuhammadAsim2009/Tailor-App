@@ -5,8 +5,11 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../controllers/profile_controller.dart';
+import '../models/expense_model.dart';
 
 class BackupExportService {
   static Future<void> createBackup(BuildContext context) async {
@@ -174,6 +177,268 @@ class BackupExportService {
     } catch (e) {
       if (!context.mounted) return;
       _showToast(context, 'Failed to export: $e', Colors.red);
+    }
+  }
+
+  static Future<void> exportExpensesToPDF(
+    BuildContext context, {
+    required List<ExpenseModel> expenses,
+    required String periodTitle,
+    String? categoryFilter,
+    String? walletSourceFilter,
+  }) async {
+    try {
+      final shopName = ProfileController().profile?.shopName ?? 'Tailor App';
+      final totalAmount = expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final shopAmount = expenses
+          .where((e) => e.walletSource != 'other')
+          .fold<double>(0.0, (sum, e) => sum + e.amount);
+      final otherAmount = expenses
+          .where((e) => e.walletSource == 'other')
+          .fold<double>(0.0, (sum, e) => sum + e.amount);
+
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          footer: (pw.Context ctx) {
+            return pw.Container(
+              alignment: pw.Alignment.centerRight,
+              margin: const pw.EdgeInsets.only(top: 10.0),
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(top: pw.BorderSide(color: PdfColors.grey)),
+              ),
+              padding: const pw.EdgeInsets.only(top: 10.0),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'Powered by TryUnity Solutions',
+                    style: pw.TextStyle(
+                      color: PdfColors.grey,
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Text(
+                    '+92 302 3476605',
+                    style: pw.TextStyle(
+                      color: PdfColors.grey,
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+          build: (pw.Context ctx) {
+            return [
+              // Header Banner
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                decoration: pw.BoxDecoration(
+                  color: PdfColor.fromHex('#1E3A5F'),
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                ),
+                child: pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          shopName,
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 18,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                        pw.SizedBox(height: 3),
+                        pw.Text(
+                          'Expenses Report',
+                          style: const pw.TextStyle(color: PdfColors.grey200, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text(
+                          'Generated: ${DateFormat('d MMM yyyy, hh:mm a').format(DateTime.now())}',
+                          style: const pw.TextStyle(color: PdfColors.grey300, fontSize: 9),
+                        ),
+                        pw.SizedBox(height: 2),
+                        pw.Text(
+                          'Period: $periodTitle',
+                          style: pw.TextStyle(
+                            color: PdfColors.white,
+                            fontSize: 10,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              pw.SizedBox(height: 14),
+
+              // KPI / Summary Row
+              pw.Row(
+                children: [
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#F8FAFC'),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0')),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Total Expenses', style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 9)),
+                          pw.SizedBox(height: 4),
+                          pw.Text('${expenses.length} records', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#0F172A'))),
+                        ],
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 8),
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#F8FAFC'),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0')),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Total Amount', style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 9)),
+                          pw.SizedBox(height: 4),
+                          pw.Text('PKR ${NumberFormat('#,##0').format(totalAmount.toInt())}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#EF4444'))),
+                        ],
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 8),
+                  pw.Expanded(
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('#F8FAFC'),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                        border: pw.Border.all(color: PdfColor.fromHex('#E2E8F0')),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Shop / Other Wallet', style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 9)),
+                          pw.SizedBox(height: 4),
+                          pw.Text('PKR ${NumberFormat('#,##0').format(shopAmount.toInt())} / ${NumberFormat('#,##0').format(otherAmount.toInt())}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColor.fromHex('#1E3A5F'))),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 12),
+
+              // Filter tags if applied
+              if (categoryFilter != null || walletSourceFilter != null) ...[
+                pw.Row(
+                  children: [
+                    if (categoryFilter != null) ...[
+                      pw.Text('Category: $categoryFilter', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                      pw.SizedBox(width: 12),
+                    ],
+                    if (walletSourceFilter != null) ...[
+                      pw.Text('Source: $walletSourceFilter', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                    ],
+                  ],
+                ),
+                pw.SizedBox(height: 8),
+              ],
+
+              // Table
+              if (expenses.isEmpty)
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(24),
+                  alignment: pw.Alignment.center,
+                  child: pw.Text('No expense records found for the selected criteria.',
+                      style: const pw.TextStyle(color: PdfColors.grey600, fontSize: 11)),
+                )
+              else
+                pw.TableHelper.fromTextArray(
+                  context: ctx,
+                  border: pw.TableBorder.all(color: PdfColor.fromHex('#E2E8F0'), width: 0.5),
+                  headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 9),
+                  headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#1E3A5F')),
+                  headerAlignment: pw.Alignment.centerLeft,
+                  cellAlignment: pw.Alignment.centerLeft,
+                  cellStyle: const pw.TextStyle(fontSize: 8.5),
+                  cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                  headers: <String>['#', 'Date', 'Expense Title', 'Category', 'Source', 'Amount'],
+                  data: List<List<String>>.generate(expenses.length, (index) {
+                    final e = expenses[index];
+                    return [
+                      '${index + 1}',
+                      DateFormat('dd MMM yyyy').format(e.date),
+                      e.title + (e.notes != null && e.notes!.isNotEmpty ? ' (${e.notes})' : ''),
+                      e.category.isNotEmpty ? e.category : 'General',
+                      e.walletSource == 'other' ? 'Other Wallet' : 'Shop Profit',
+                      'PKR ${NumberFormat('#,##0').format(e.amount.toInt())}',
+                    ];
+                  }),
+                ),
+
+              pw.SizedBox(height: 12),
+              // Grand Total Row
+              pw.Container(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text(
+                  'Grand Total: PKR ${NumberFormat('#,##0').format(totalAmount.toInt())}',
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromHex('#0F172A'),
+                  ),
+                ),
+              ),
+            ];
+          },
+        ),
+      );
+
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        directory = await getApplicationDocumentsDirectory();
+      }
+
+      final fileName = 'expenses_report_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final file = File(join(directory!.path, fileName));
+      await file.writeAsBytes(await pdf.save());
+
+      if (!context.mounted) return;
+      _showToast(context, 'PDF saved to Downloads!', Colors.green);
+
+      try {
+        await Share.shareXFiles([XFile(file.path)], subject: 'Expenses Report - $shopName');
+      } catch (_) {}
+    } catch (e) {
+      if (!context.mounted) return;
+      _showToast(context, 'Failed to export expenses: $e', Colors.red);
     }
   }
 

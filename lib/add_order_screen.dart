@@ -695,9 +695,13 @@ class _AddOrderScreenState extends State<AddOrderScreen>
         appBar: _buildAppBar(),
         body: Column(
           children: [
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildStepper(),
-            const SizedBox(height: 24),
+            if (_currentStep == 2 || _currentStep == 3) ...[
+              const SizedBox(height: 12),
+              _buildCustomerInfoBanner(),
+            ],
+            const SizedBox(height: 16),
             Expanded(
               child: PageView(
                 controller: _pageController,
@@ -707,6 +711,131 @@ class _AddOrderScreenState extends State<AddOrderScreen>
                   _buildStep2Type(),
                   _buildStep4Measurements(),
                   _buildStep3Order(),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomerInfoBanner() {
+    final customerId = _selectedCustomer?.id ?? _idCtrl.text.trim();
+    final customerName = _selectedCustomer?.name.isNotEmpty == true
+        ? _selectedCustomer!.name
+        : (_nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : 'Customer');
+
+    final customerOrders = _orderController.orders
+        .where((o) => o.customerId == customerId && o.deletedAt == null);
+    final totalDues = customerOrders.fold<double>(
+      0,
+      (sum, o) => sum + (o.totalAmount - o.advancePaid),
+    );
+    final bool hasDues = totalDues > 0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: kCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: kTextPri.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: kPrimary.withValues(alpha: 0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  customerName.isNotEmpty ? customerName[0].toUpperCase() : '?',
+                  style: GoogleFonts.inter(
+                    color: kPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    customerName,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: kTextPri,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'ID: $customerId',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: kTextSec,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: hasDues
+                    ? Colors.red.shade50
+                    : const Color(0xFF10B981).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: hasDues
+                      ? Colors.red.shade200
+                      : const Color(0xFF10B981).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    hasDues ? 'Total Dues' : 'Dues Status',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: hasDues ? Colors.red.shade700 : const Color(0xFF047857),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    hasDues
+                        ? 'Rs. ${NumberFormat('#,##0').format(totalDues.toInt())}'
+                        : 'Rs. 0 (Cleared)',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: hasDues ? Colors.red.shade700 : const Color(0xFF047857),
+                    ),
+                  ),
                 ],
               ),
             ),
