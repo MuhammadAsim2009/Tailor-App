@@ -650,6 +650,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           textColor: kTextPrimary,
           iconColor: Colors.purple,
           isCurrency: true,
+          onTap: () => _showMonthlyRevenueLedgerSheet(sel),
         ),
       ],
     );
@@ -1890,6 +1891,537 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  void _showMonthlyRevenueLedgerSheet(DateTime monthDate) {
+    DateTimeRange? selectedRange;
+    String activeFilter = 'Month'; // 'Today', 'This Week', 'Month', 'Custom'
+    final firstDayOfMonth = DateTime(monthDate.year, monthDate.month, 1);
+    final lastDayOfMonth = DateTime(monthDate.year, monthDate.month + 1, 0);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final now = DateTime.now();
+
+            // Collect all payments (income) in this month
+            final monthPayments = _orderController.payments
+                .where((p) => _isSameMonth(p.paidAt, monthDate))
+                .toList();
+
+            // Collect all shop expenses in this month (walletSource != 'other' and deletedAt == null)
+            final monthExpenses = _expenseController.expenses
+                .where((e) =>
+                    e.deletedAt == null &&
+                    e.walletSource != 'other' &&
+                    _isSameMonth(e.date, monthDate))
+                .toList();
+
+            // Convert to unified ledger items
+            final allItems = <_RevenueLedgerItem>[
+              ...monthPayments.map((p) => _RevenueLedgerItem(
+                    title: 'Order #${p.orderId} Payment',
+                    subtitle: 'Customer: ${_orderController.getCustomerName(p.customerId)}',
+                    amount: p.amount,
+                    date: p.paidAt,
+                    isIncome: true,
+                    category: 'Income',
+                  )),
+              ...monthExpenses.map((e) => _RevenueLedgerItem(
+                    title: e.title.isNotEmpty ? e.title : 'Shop Expense',
+                    subtitle: e.category.isNotEmpty ? e.category : 'Expense',
+                    amount: e.amount,
+                    date: e.date,
+                    isIncome: false,
+                    category: e.category,
+                  )),
+            ];
+
+            // Filter items based on activeFilter
+            final filteredItems = allItems.where((item) {
+              final d = item.date.toLocal();
+
+              if (activeFilter == 'Month') {
+                return true;
+              } else if (activeFilter == 'Today') {
+                // If the inspected month contains 'today', match today; otherwise compare with monthDate day
+                if (now.year == monthDate.year && now.month == monthDate.month) {
+                  return d.year == now.year && d.month == now.month && d.day == now.day;
+                }
+                return d.year == monthDate.year &&
+                    d.month == monthDate.month &&
+                    d.day == monthDate.day;
+              } else if (activeFilter == 'This Week') {
+                final refDate = (now.year == monthDate.year && now.month == monthDate.month)
+                    ? now
+                    : monthDate;
+                final startOfWeek = refDate.subtract(Duration(days: refDate.weekday - 1));
+                final start = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+                final endOfWeek = start.add(const Duration(days: 7));
+                return d.isAfter(start.subtract(const Duration(seconds: 1))) &&
+                    d.isBefore(endOfWeek);
+              } else if (activeFilter == 'Custom' && selectedRange != null) {
+                final start = DateTime(
+                  selectedRange!.start.year,
+                  selectedRange!.start.month,
+                  selectedRange!.start.day,
+                );
+                final end = DateTime(
+                  selectedRange!.end.year,
+                  selectedRange!.end.month,
+                  selectedRange!.end.day,
+                  23,
+                  59,
+                  59,
+                );
+                return d.isAfter(start.subtract(const Duration(seconds: 1))) &&
+                    d.isBefore(end.add(const Duration(seconds: 1)));
+              }
+              return true;
+            }).toList()
+              ..sort((a, b) => b.date.compareTo(a.date));
+
+            final totalIncome = filteredItems
+                .where((i) => i.isIncome)
+                .fold<double>(0, (sum, i) => sum + i.amount);
+            final totalExpense = filteredItems
+                .where((i) => !i.isIncome)
+                .fold<double>(0, (sum, i) => sum + i.amount);
+            final netRevenue = totalIncome - totalExpense;
+
+            Future<void> pickCustomRange() async {
+              final initialEnd = lastDayOfMonth.isBefore(DateTime.now())
+                  ? lastDayOfMonth
+                  : DateTime.now();
+              final safeInitialEnd = initialEnd.isBefore(firstDayOfMonth)
+                  ? firstDayOfMonth
+                  : initialEnd;
+
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: firstDayOfMonth,
+                lastDate: lastDayOfMonth,
+                initialDateRange: selectedRange ??
+                    DateTimeRange(
+                      start: firstDayOfMonth,
+                      end: safeInitialEnd,
+                    ),
+                helpText: 'Select range within ${DateFormat('MMMM yyyy').format(monthDate)}',
+                builder: (pickerCtx, child) => Theme(
+                  data: Theme.of(pickerCtx).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: kPrimaryColor,
+                      onPrimary: Colors.white,
+                      onSurface: kPrimaryColor,
+                    ),
+                  ),
+                  child: child!,
+                ),
+              );
+              if (picked != null) {
+                setSheetState(() {
+                  selectedRange = picked;
+                  activeFilter = 'Custom';
+                });
+              }
+            }
+
+            final monthLabel = DateFormat('MMMM yyyy').format(monthDate);
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Sheet Title & Close
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$monthLabel Revenue Ledger',
+                              style: GoogleFonts.inter(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: kPrimaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Income & shop expenses breakdown',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: kTextSecondary),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Summary Banner Card
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1E3A5F), Color(0xFF2A5298)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kPrimaryColor.withValues(alpha: 0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Net Revenue',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  activeFilter == 'Custom' && selectedRange != null
+                                      ? '${DateFormat('d MMM').format(selectedRange!.start)} - ${DateFormat('d MMM').format(selectedRange!.end)}'
+                                      : activeFilter,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                'PKR ',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              Text(
+                                '${netRevenue.toInt()}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1, color: Colors.white24),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981)
+                                            .withValues(alpha: 0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_downward,
+                                        size: 14,
+                                        color: Color(0xFF10B981),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Income',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: Colors.white60,
+                                          ),
+                                        ),
+                                        Text(
+                                          '+PKR ${totalIncome.toInt()}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFF10B981),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                width: 1,
+                                height: 26,
+                                color: Colors.white24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.redAccent.withValues(alpha: 0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.arrow_upward,
+                                        size: 14,
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Shop Expense',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: Colors.white60,
+                                          ),
+                                        ),
+                                        Text(
+                                          '-PKR ${totalExpense.toInt()}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.redAccent,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Filter Chips: Today, This Week, Month, Custom
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        _buildWalletFilterChip(
+                          label: 'This Month',
+                          isSelected: activeFilter == 'Month',
+                          onTap: () => setSheetState(() {
+                            activeFilter = 'Month';
+                            selectedRange = null;
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildWalletFilterChip(
+                          label: 'Today',
+                          isSelected: activeFilter == 'Today',
+                          onTap: () => setSheetState(() {
+                            activeFilter = 'Today';
+                            selectedRange = null;
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildWalletFilterChip(
+                          label: 'This Week',
+                          isSelected: activeFilter == 'This Week',
+                          onTap: () => setSheetState(() {
+                            activeFilter = 'This Week';
+                            selectedRange = null;
+                          }),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildWalletFilterChip(
+                          label: activeFilter == 'Custom' && selectedRange != null
+                              ? '${DateFormat('d MMM').format(selectedRange!.start)} - ${DateFormat('d MMM').format(selectedRange!.end)}'
+                              : 'Custom Range 📅',
+                          isSelected: activeFilter == 'Custom',
+                          icon: Icons.date_range,
+                          onTap: pickCustomRange,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  // Header row of ledger list
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Transactions',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: kPrimaryColor,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${filteredItems.length} records',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: kTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1),
+                  // List
+                  Expanded(
+                    child: filteredItems.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.receipt_long_outlined,
+                                  size: 48,
+                                  color: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'No transactions found for this period',
+                                  style: GoogleFonts.inter(
+                                    color: kTextSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            itemCount: filteredItems.length,
+                            separatorBuilder: (context, index) =>
+                                Divider(height: 1, color: Colors.grey.shade100),
+                            itemBuilder: (context, index) {
+                              final item = filteredItems[index];
+                              final isIncome = item.isIncome;
+                              return ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: isIncome
+                                        ? const Color(0xFF10B981)
+                                            .withValues(alpha: 0.1)
+                                        : Colors.red.withValues(alpha: 0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    isIncome
+                                        ? Icons.arrow_downward
+                                        : Icons.arrow_upward,
+                                    color: isIncome
+                                        ? const Color(0xFF10B981)
+                                        : Colors.red,
+                                    size: 20,
+                                  ),
+                                ),
+                                title: Text(
+                                  item.title,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: kTextPrimary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${item.subtitle} • ${DateFormat('d MMM yyyy, hh:mm a').format(item.date)}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: kTextSecondary,
+                                  ),
+                                ),
+                                trailing: Text(
+                                  '${isIncome ? '+' : '-'} PKR ${item.amount.toInt()}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: isIncome
+                                        ? const Color(0xFF10B981)
+                                        : Colors.red,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildWalletFilterChip({
     required String label,
     required bool isSelected,
@@ -2661,6 +3193,24 @@ class _AnimatedCounterState extends State<AnimatedCounter>
       },
     );
   }
+}
+
+class _RevenueLedgerItem {
+  final String title;
+  final String subtitle;
+  final double amount;
+  final DateTime date;
+  final bool isIncome;
+  final String category;
+
+  _RevenueLedgerItem({
+    required this.title,
+    required this.subtitle,
+    required this.amount,
+    required this.date,
+    required this.isIncome,
+    required this.category,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────
